@@ -11,13 +11,43 @@ const card = { id: '1', han: '가', kanji: '家', state: '', flagged: true };
 
 test('all eight ranks use the requested labels and source state precedes flag', () => {
   assert.deepEqual(RANKS.map(({ id, label }) => [id, label]), [
-    ['required', '必須！'], ['next', '次'], ['later', 'あとで'], ['manji', '卍マジ'],
-    ['fair', 'まあまあ'], ['mastered', '覚えた'], ['read', 'read'], ['read2', 'read2'],
+    ['required', '優先'], ['next', '次に学ぶ'], ['later', 'あとで'], ['manji', 'テスト待ち'],
+    ['fair', '練習中'], ['mastered', '覚えた'], ['read', '読むテスト済み'], ['read2', '定着'],
   ]);
   assert.equal(initialRank(card), 'required');
   assert.equal(initialRank({ ...card, flagged: false }), 'next');
   for (const rank of RANKS) assert.equal(initialRank({ ...card, state: rank.label }), rank.id);
   assert.equal(initialRank({ ...card, state: '不明' }), 'required');
+});
+
+test('source aliases and previously saved rank labels retain their learning position', () => {
+  const aliases = [
+    ['必須！', 'required'], ['必須', 'required'], ['必須!', 'required'], ['！', 'required'],
+    ['次', 'next'], ['卍マジ', 'manji'], ['卍GO', 'manji'], ['卍行け', 'manji'],
+    ['まあまあ', 'fair'], ['read', 'read'], ['read2', 'read2'], ['read3', 'read2'],
+    ['書ける', 'read2'], ['remember', 'mastered'], ['パス', 'later'],
+  ];
+  for (const [state, expected] of aliases) {
+    // An explicit source state wins even when the original priority flag is set.
+    assert.equal(initialRank({ ...card, state: ` ${state} ` }), expected, state);
+    assert.equal(getRecord(card, { [card.id]: { rank: state } }).rank, expected, state);
+    assert.equal(setRank(getRecord(card), state, NOW).rank, expected, state);
+  }
+  assert.equal(initialRank({ ...card, state: '', flagged: false, sourceRemember: true }), 'next');
+});
+
+test('source reading state unlocks the matching checkpoint without erasing local progress', () => {
+  const readingCard = { ...card, state: 'read' };
+  const sourceRecord = getRecord(readingCard);
+  assert.equal(sourceRecord.rank, 'read');
+  assert.equal(isEligible(readingCard, sourceRecord, 'read'), false);
+  assert.equal(isEligible(readingCard, sourceRecord, 'write'), true);
+  assert.equal(recordWriting(sourceRecord, true, NOW).rank, 'read2');
+
+  const locallyRelearning = { [card.id]: { rank: 'manji' } };
+  assert.equal(getRecord(readingCard, locallyRelearning).rank, 'manji');
+  assert.equal(getRecord({ ...card, state: 'read3' }).rank, 'read2');
+  assert.equal(isEligible(card, getRecord({ ...card, state: 'remember' }), 'read'), true);
 });
 
 test('record defaults and normalization give independent nested histories', () => {

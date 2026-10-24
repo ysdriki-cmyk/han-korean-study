@@ -1,24 +1,32 @@
 /** Shared learning ranks. The rank belongs to a card, across both directions. */
 export const RANKS = Object.freeze([
-  { id: 'required', label: '必須！', description: '優先して覚えたいカード' },
-  { id: 'next', label: '次', description: '次に取り組むカード' },
+  { id: 'required', label: '優先', description: '優先して覚えたいカード' },
+  { id: 'next', label: '次に学ぶ', description: '次に取り組むカード' },
   { id: 'later', label: 'あとで', description: 'あとで取り組むカード' },
-  { id: 'manji', label: '卍マジ', description: 'もう一度覚えたいカード' },
-  { id: 'fair', label: 'まあまあ', description: 'もう少しで覚えられそうなカード' },
+  { id: 'manji', label: 'テスト待ち', description: '次の思い出すテストに出すカード' },
+  { id: 'fair', label: '練習中', description: '思い出す練習で一度答えられたカード' },
   { id: 'mastered', label: '覚えた', description: '思い出せたので読みを確認するカード' },
-  { id: 'read', label: 'read', description: '読みを確認し、書き取りに進めるカード' },
-  { id: 'read2', label: 'read2', description: '書き取りまで確認できたカード' },
+  { id: 'read', label: '読むテスト済み', description: '読むテストを終え、書くテストに進むカード' },
+  { id: 'read2', label: '定着', description: '書くテストまで確認できたカード' },
 ].map(Object.freeze));
 
 const DIRECTIONS = ['ko-han', 'han-ko'];
 const EARLY_RANKS = new Set(['required', 'next', 'later', 'manji']);
 const STAGES = Object.freeze({ recall: new Set(['manji', 'fair']), read: new Set(['mastered']), write: new Set(['read']) });
 const clean = (value) => String(value ?? '').normalize('NFC').trim();
+// Keep existing browser records and the two original spreadsheets readable.
+// These source aliases never appear as the public-facing rank labels.
+const LEGACY_RANKS = new Map([
+  ['必須！', 'required'], ['必須', 'required'], ['必須!', 'required'], ['！', 'required'], ['!', 'required'],
+  ['次', 'next'], ['卍マジ', 'manji'], ['卍GO', 'manji'], ['卍行け', 'manji'],
+  ['まあまあ', 'fair'], ['書ける', 'read2'], ['read3', 'read2'],
+  ['remember', 'mastered'], ['パス', 'later'],
+]);
 
 function rankId(value) {
   const candidate = clean(value);
   return RANKS.find((rank) => rank.id === candidate || rank.label === candidate)?.id
-    ?? (['必須', '必須!', '！', '!'].includes(candidate) ? 'required' : null);
+    ?? LEGACY_RANKS.get(candidate) ?? null;
 }
 
 /** Explicit sheet state takes precedence over the original ！ flag. */

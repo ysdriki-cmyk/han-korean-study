@@ -1,6 +1,6 @@
 # 管理者向け: Cloudflare Pagesで教材を連携する
 
-利用者は学習操作をWebサイト内で完結できます。教材CSV、Google Sheetsの接続先、更新間隔は管理者が配信時に設定し、利用者の画面にファイル入出力や接続設定を設けません。
+利用者は「漢字・意味」と「単語」の教材を切り替え、共通の「えらぶ → 思い出す → 読むテスト → 書くテスト」で学習します。教材CSV、Google Sheetsの接続先、更新間隔は管理者が配信時に設定し、利用者の画面にファイル入出力や接続設定を設けません。
 
 ## Pagesへ配置する
 
@@ -19,14 +19,18 @@
 
 1. Google Sheetsの教材タブをCSV形式で公開します。
 2. Pagesの環境変数 **`SHEET_CSV_URL`** に公開URLを設定します。ProductionとPreviewはそれぞれ設定してください。
-3. `dist/assets/config.js` の `window.APP_CONFIG.csvUrl` を `/api/cards` に設定します。
+3. `dist/assets/config.js` で、漢字教材なら `window.APP_CONFIG.decks.kanji.csvUrl`、単語教材なら `window.APP_CONFIG.decks.vocabulary.csvUrl` を `/api/cards` に設定します。
 4. 再デプロイします。以後はアプリが設定された教材を読み込みます。
 
 ```text
 https://docs.google.com/spreadsheets/d/e/公開ID/pub?gid=0&single=true&output=csv
 ```
 
-`https://docs.google.com/spreadsheets/d/シートID/export?format=csv&gid=0` 形式も受け付けます。認証を必要としない教材用のシートを指定してください。管理者が公開CSVへ直接接続する構成にする場合は、`csvUrl` にそのURLを設定し、Functionを省略できます。
+`https://docs.google.com/spreadsheets/d/シートID/export?format=csv&gid=0` 形式も受け付けます。認証を必要としない教材用のシートを指定してください。管理者が公開CSVへ直接接続する構成にする場合は、対象教材の接続先にそのURLを設定し、Functionを省略できます。
+
+同梱教材は漢字650枚・単語4,559枚です。2教材の接続先は別々に管理します。現在の `/api/cards` は環境変数一つで指定した一つのCSVを返すAPIです。両教材を別々のSheetsから中継する場合は、管理者が教材ごとの固定ルートと環境変数を追加してください。利用者のURL引数で任意の取得先を指定する構成にはしません。
+
+初期表示は `defaultDeck: 'vocabulary'`、同梱教材は `decks.vocabulary.fallbackCsvUrl: './data/vocabulary.csv'` と `decks.kanji.fallbackCsvUrl: './data/cards.csv'` です。旧形式のトップ階層 `csvUrl` は漢字教材用の互換設定に限り、新しく設定する場合は `decks` の教材別URLを使います。
 
 更新間隔は `config.js` の `refreshIntervalMs`、ブラウザの取得時間の上限は `fetchTimeoutMs` で管理します。利用者による接続操作は不要です。Googleの公開版への更新には数分かかる場合があるため、定期取得でも即時反映は保証できません。[Google公式の更新について](https://support.google.com/docs/answer/183965?hl=ja)
 
@@ -44,8 +48,10 @@ https://docs.google.com/spreadsheets/d/e/公開ID/pub?gid=0&single=true&output=c
 
 ## 学習記録と将来の同期
 
-現在の連携は **Sheets → アプリ** の教材読み取りです。共通ランクと方向別の学習記録は各ブラウザに保存され、スプレッドシートには書き戻しません。利用者のファイル操作をなくしても、端末間の同期が追加されるわけではありません。
+現在の連携は **Sheets → アプリ** の教材読み取りです。共通ランクと方向別の学習記録は教材ごとに分けて各ブラウザに保存され、スプレッドシートには書き戻しません。利用者のファイル操作をなくしても、端末間の同期が追加されるわけではありません。
 
-端末間で共有する段階では、利用者認証と、カードIDをキーにした学習記録テーブルを追加します。スプレッドシートへの書き戻しには、サーバー側のGoogle Sheets API認証、更新権限、競合解決も必要です。サービスアカウント鍵やAPIトークンは `dist/` や公開JavaScriptに置きません。
+保存キー `han-hanja:learning:v3` のカードIDは `kanji:<No>` と `vocabulary:<No>` を使います。教材を追加・更新するときは、これらのIDを変更・再利用しません。
+
+端末間で共有する段階では、利用者認証と、教材ID・カードIDをキーにした学習記録テーブルを追加します。スプレッドシートへの書き戻しには、サーバー側のGoogle Sheets API認証、更新権限、競合解決も必要です。サービスアカウント鍵やAPIトークンは `dist/` や公開JavaScriptに置きません。
 
 このコードを追加しただけでは、利用者のCloudflareアカウントやGoogle Sheetsには接続されません。管理者による実際のURL・環境変数の設定と配信が必要です。
