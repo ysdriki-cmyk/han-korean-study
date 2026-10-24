@@ -10,8 +10,9 @@
   <link rel="stylesheet" href="./assets/practice.css">
   <link rel="stylesheet" href="./assets/supporting.css">
   <link rel="stylesheet" href="./assets/ratings.css?v=3">
+  <link rel="stylesheet" href="./assets/review.css?v=3">
   <script src="./assets/config.js" defer></script>
-  <script type="module" src="./assets/app.js?v=6"></script>
+  <script type="module" src="./assets/app.js?v=11"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -32,8 +33,8 @@
   </div>
     <div class="mode-toolbar">
       <div class="mode-switch" role="group" aria-label="演習モード">
-        <button data-mode="read" aria-pressed="true"><span data-icon="book"></span><span class="mode-copy"><strong>意味を答える</strong><small id="read-mode-caption">韓国語 → 日本語・英語</small></span></button>
-        <button data-mode="write" aria-pressed="false"><span data-icon="pen"></span><span class="mode-copy"><strong>韓国語を書く</strong><small id="write-mode-caption">日本語・英語 → 韓国語</small></span></button>
+        <button data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>
+        <button data-mode="read" aria-pressed="false"><span data-icon="book"></span><span class="mode-copy"><strong id="read-mode-label">읽기（한→漢）</strong></span></button>
       </div>
       <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="出題設定" title="出題設定"><span data-icon="sliders"></span><span>出題設定</span></button>
     </div>
@@ -72,15 +73,17 @@
   <form id="settings-form">
     <div class="settings-content">
       <section class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
+      <section id="settings-scope-section" class="settings-section"><h3>出題範囲</h3><div id="settings-scope" class="choice-row" role="group" aria-label="出題範囲"></div></section>
       <section class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div></section>
       <section class="settings-section"><h3>何枚やる？</h3><div id="settings-limit" class="choice-row" role="group" aria-label="出題枚数"></div></section>
       <section class="settings-section"><h3>出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
-      <details class="settings-advanced"><summary>復習をしぼる</summary>
+      <details class="settings-advanced"><summary>詳細設定</summary>
+        <label class="check-label due-toggle"><input id="settings-due" type="checkbox" checked>復習日が来たカードも出す</label>
         <h3>過去に間違えたカード</h3><div id="settings-mistakes" class="choice-row" role="group" aria-label="間違えた期間"></div>
         <h3>最近演習したカードを除く</h3><div id="settings-recent" class="choice-row" role="group" aria-label="最近の演習を除外"></div>
       </details>
     </div>
-    <div class="settings-footer"><span class="settings-match"><strong id="settings-match">0</strong> 枚が対象</span><button id="reset-settings" type="button" class="button secondary">リセット</button><button id="apply-settings" type="submit" class="button primary">演習を始める</button></div>
+    <div class="settings-footer"><span class="settings-match"><strong id="settings-match">0</strong> 枚が対象</span><button id="reset-settings" type="button" class="reset-settings">初期設定</button><button id="save-settings" type="button" class="button secondary">設定だけ保存</button><button id="apply-settings" type="submit" class="button primary">演習を始める</button></div>
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" hidden></div>

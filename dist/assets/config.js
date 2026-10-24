@@ -1,5 +1,5 @@
 window.APP_CONFIG = {
-  defaultDeck: 'vocabulary',
+  defaultDeck: 'kanji',
   decks: {
     vocabulary: {csvUrl: '', fallbackCsvUrl: './data/vocabulary.csv'},
     kanji: {csvUrl: '', fallbackCsvUrl: './data/cards.csv'}

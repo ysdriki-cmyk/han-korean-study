@@ -1,0 +1,40 @@
+.mode-switch { width: 480px; }
+.mode-switch button { justify-content: center; gap: 10px; }
+.mode-copy strong { white-space: nowrap; font-size: 16px; }
+.mode-switch svg { width: 22px; height: 22px; }
+.settings-presets { grid-template-columns: repeat(4,minmax(0,1fr)); }
+.settings-presets .preset-button { font-size: 13px; padding: 10px 8px; }
+.settings-footer { flex-wrap: wrap; gap: 10px; }
+.settings-match { margin-right: auto; }
+.reset-settings { color: #667085; font-size: 12px; padding: 8px 2px; }
+.reset-settings:hover { color: var(--blue); }
+#save-settings { font-size: 13px; }
+.due-toggle { white-space: normal; margin: 0 0 16px; font-size: 13px; }
+.review-note { margin: 8px 0 12px; text-align: right; font-size: 12px; color: #56806d; }
+.recall-form textarea { display: block; width: 100%; min-height: 76px; resize: vertical; padding: 12px 15px; border: 1px solid #c6d4e7; border-radius: 10px; background: #fafcff; color: #263348; font: inherit; font-size: 17px; line-height: 1.6; }
+.recall-form textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px #2879ec15; }
+.recall-form textarea::placeholder { color: #8b97a8; font-size: 13px; }
+.flashcard[data-mode=read]:not(.revealed) .question-word { font-size: 72px; }
+.flashcard[data-mode=read]:not(.revealed) .question-word.long { font-size: 42px; }
+@media(max-width:720px) {
+ .session-label { display: inline; font-size: 11px; margin-right: 4px; }
+ .settings-presets { grid-template-columns: repeat(2,minmax(0,1fr)); }
+ .settings-presets .preset-button { font-size: 12px; padding: 9px 5px; }
+ .mode-toolbar { gap: 9px; }
+ .mode-switch { width: auto; }
+ .mode-copy strong { font-size: 14px; }
+ .mode-switch button { padding: 10px 5px; }
+ .settings-footer .settings-match { flex: 1; }
+ .settings-footer .reset-settings { font-size: 11px; }
+ #save-settings { font-size: 12px; }
+ .settings-footer #apply-settings { flex: 1; }
+ .settings-footer #save-settings { flex: 1; }
+ .settings-footer .settings-match { flex-basis: calc(100% - 70px); }
+ .recall-form textarea { font-size: 16px; }
+ .flashcard[data-mode=read]:not(.revealed) .question-word { font-size: 64px; }
+ .flashcard[data-mode=read]:not(.revealed) .question-word.long { font-size: 36px; }
+}
+@media(max-width:374px) {
+ .mode-copy strong { font-size: 12px; }
+ .mode-switch button { padding: 10px 2px; }
+}
