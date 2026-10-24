@@ -1,8 +1,9 @@
 import { makeSession } from './core.js';
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer } from './vocabulary.js';
-import { RANKS, getRecord, setRank, recordRecall, recordWriting, matchHangul } from './learning.js';
-import { practiceSettings, practicePool } from './practice.js';
+import { getRecord, matchHangul } from './learning.js';
+import { RATINGS, UNSEEN, ratingFor, recordAssessment, filterAssessments } from './assessment.js';
+import { practiceSettings, practicePool } from './practice.js?v=4';
 import { icon } from './icons.js?v=2';
 
 const $ = selector => document.querySelector(selector);
@@ -10,7 +11,10 @@ const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const config = window.APP_CONFIG || {};
 const RECORD_KEY = 'han-hanja:learning:v3', PREF_KEY = 'han-hanja:preferences:v3';
-const rankById = new Map(RANKS.map(rank => [rank.id, rank]));
+const STATUSES = [...RATINGS, UNSEEN];
+const ratingById = new Map(STATUSES.map(item => [item.id, item]));
+const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '自信あり', unseen: '未演習' };
+let draftSettings = null;
 const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'study', activeDeck = 'vocabulary';
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
@@ -37,8 +41,8 @@ function toast(text, error = false) {
   toastTimer = setTimeout(() => { el.hidden = true; }, 3200);
 }
 function record(card) { return getRecord(card, records); }
-function rank(card) { return record(card).rank; }
-function badge(id) { return `<span class="rank-badge rank-${id}">${esc(rankById.get(id)?.label || '')}</span>`; }
+function rank(card) { return ratingFor(card, records, settings.mode); }
+function badge(id) { const item = ratingById.get(id) || UNSEEN; return `<span class="assessment-badge rating-${item.id}" title="${esc(item.label)}"><span class="rating-symbol">${item.symbol}</span><span>${ratingLabels[item.id]}</span></span>`; }
 function saveRecords() { safeWrite(RECORD_KEY, { version: 3, records }); }
 function savePreferences() {
   preferences.deckId = activeDeck;
@@ -46,7 +50,7 @@ function savePreferences() {
   safeWrite(PREF_KEY, preferences);
 }
 function counts() {
-  const result = Object.fromEntries(RANKS.map(item => [item.id, 0]));
+  const result = Object.fromEntries(STATUSES.map(item => [item.id, 0]));
   cards.forEach(card => { result[rank(card)] += 1; }); return result;
 }
 function pool() { return practicePool(cards, records, settings); }
@@ -69,29 +73,47 @@ function updateCourseChrome() {
   document.title = `한と漢 — ${activeDeck === 'vocabulary' ? '単語暗記' : '漢字対応'}`;
 }
 function renderOverview() {
-  const totals = counts(), mastered = totals.mastered + totals.read + totals.read2;
+  const totals = counts(), mastered = totals.good + totals.solid;
   $('#nav-count').textContent = cards.length.toLocaleString('ja-JP');
   $('#library-total').textContent = cards.length.toLocaleString('ja-JP');
   $('#settled-count').textContent = mastered.toLocaleString('ja-JP');
   $('#settled-percent').textContent = `${cards.length ? Math.round(mastered / cards.length * 100) : 0}%`;
-  $('#rank-distribution').innerHTML = RANKS.filter(item => totals[item.id]).map(item => `<span class="rank-${item.id}" style="width:${totals[item.id] / cards.length * 100}%" title="${esc(item.label)} ${totals[item.id]}枚"></span>`).join('');
+  $('#rank-distribution').innerHTML = STATUSES.filter(item => totals[item.id]).map(item => `<span class="rating-${item.id}" style="width:${totals[item.id] / cards.length * 100}%;background:var(--rating-line)" title="${esc(item.symbol)} ${totals[item.id]}枚"></span>`).join('');
   $('#rank-distribution').setAttribute('role', 'img');
-  $('#rank-distribution').setAttribute('aria-label', RANKS.map(item => `${item.label}${totals[item.id]}枚`).join('、'));
-  $('#rank-board').innerHTML = RANKS.map(item => `<button class="rank-tile rank-${item.id}" data-rank-tile="${item.id}">${badge(item.id)}<strong>${totals[item.id].toLocaleString('ja-JP')}<small>枚</small></strong></button>`).join('');
-  $('#rank-filters').innerHTML = `<button class="rank-filter" data-rank-filter="all" aria-pressed="${rankFilter === 'all'}">すべて <strong>${cards.length}</strong></button>` + RANKS.map(item => `<button class="rank-filter" data-rank-filter="${item.id}" aria-pressed="${rankFilter === item.id}"><span class="rank-dot rank-${item.id}"></span>${esc(item.label)} <strong>${totals[item.id]}</strong></button>`).join('');
+  $('#rank-distribution').setAttribute('aria-label', STATUSES.map(item => `${item.label}${totals[item.id]}枚`).join('、'));
+  $('#rank-board').innerHTML = STATUSES.map(item => `<button class="rank-tile rating-${item.id}" data-rank-tile="${item.id}">${badge(item.id)}<strong>${totals[item.id].toLocaleString('ja-JP')}<small>枚</small></strong></button>`).join('');
+  $('#rank-filters').innerHTML = `<button data-rank-filter="all" aria-pressed="${rankFilter === 'all'}">すべて <strong>${cards.length.toLocaleString('ja-JP')}</strong></button>` + STATUSES.map(item => `<button class="rating-${item.id}" data-rank-filter="${item.id}" aria-pressed="${rankFilter === item.id}" aria-label="${esc(item.label)} ${totals[item.id]}枚"><span class="rating-symbol">${item.symbol}</span>${item.id === 'unseen' ? '<span>未演習</span>' : ''}<strong>${totals[item.id].toLocaleString('ja-JP')}</strong></button>`).join('');
   renderSessionStats();
 }
 function renderSessionStats() {
   const right = [...answers.values()].filter(answer => answer.passed).length;
   $('#session-done').textContent = answers.size; $('#session-total').textContent = session.length;
-  $('#session-score').textContent = `正解 ${right}`;
+  $('#session-score').textContent = `${settings.mode === 'write' ? '正解' : '○・◎'} ${right}`;
   $('#session-progress').style.width = `${session.length ? answers.size / session.length * 100 : 0}%`;
   $('.session-progress').setAttribute('aria-valuemax', String(session.length));
   $('.session-progress').setAttribute('aria-valuenow', String(answers.size));
 }
-function syncSettingsForm() {
-  $('#practice-filter').value = settings.filter; $('#session-limit').value = settings.limit; $('#shuffle').checked = settings.shuffle;
+function syncSettingsForm() { draftSettings = { ...settings, ratings: [...settings.ratings] }; }
+function choiceButtons(field, options) {
+  return options.map(([value, label]) => `<button type="button" class="choice-chip" data-choice="${field}" data-choice-value="${value}" aria-pressed="${String(draftSettings[field]) === String(value)}">${label}</button>`).join('');
 }
+function renderSettings() {
+  if (!draftSettings) syncSettingsForm();
+  const totals = counts();
+  const presets = [{id:'all', label:'すべて', ratings:STATUSES.map(item => item.id)}, {id:'weak', label:'苦手を集中', ratings:['hard','again','unsure']}, {id:'new', label:'未演習から', ratings:['unseen']}];
+  $('#settings-presets').innerHTML = presets.map(item => `<button type="button" class="preset-button" data-preset="${item.id}" aria-pressed="${!draftSettings.recentMistakesDays && !draftSettings.excludeRecentDays && item.ratings.length === draftSettings.ratings.length && item.ratings.every(id => draftSettings.ratings.includes(id))}">${item.label}</button>`).join('');
+  $('#settings-ratings').innerHTML = STATUSES.map(item => `<button type="button" class="rating-choice rating-${item.id}" data-settings-rating="${item.id}" aria-pressed="${draftSettings.ratings.includes(item.id)}" aria-label="${esc(item.label)} ${totals[item.id]}枚"><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span><span class="rating-count">${totals[item.id].toLocaleString('ja-JP')}枚</span></button>`).join('');
+  $('#settings-limit').innerHTML = choiceButtons('limit', [['10','10枚'],['20','20枚'],['50','50枚'],['all','すべて']]);
+  $('#settings-order').innerHTML = choiceButtons('shuffle', [[true,`${icon('shuffle')}ランダム`],[false,`${icon('layers')}順番に`]]);
+  $('#settings-mistakes').innerHTML = choiceButtons('recentMistakesDays', [[0,'指定しない'],[7,'1週間'],[14,'2週間'],[30,'1か月'],[90,'3か月']]);
+  $('#settings-recent').innerHTML = choiceButtons('excludeRecentDays', [[0,'除外しない'],[3,'3日以内'],[7,'1週間以内'],[14,'2週間以内'],[30,'1か月以内'],[90,'3か月以内']]);
+  const matching = filterAssessments(cards, records, draftSettings).length;
+  const amount = draftSettings.limit === 'all' ? matching : Math.min(matching, Number(draftSettings.limit));
+  $('#settings-match').textContent = matching.toLocaleString('ja-JP');
+  $('#apply-settings').textContent = amount ? `${amount.toLocaleString('ja-JP')}枚で始める` : '対象がありません';
+  $('#apply-settings').disabled = !amount;
+}
+
 function startSession(custom = null, { continuing = false, all = false } = {}) {
   composing = false; compositionEndedAt = 0;
   if (!continuing) cycleSeen = new Set();
@@ -107,7 +129,7 @@ function switchDeck(id) {
 }
 function switchMode(mode) {
   if (!['read', 'write'].includes(mode) || mode === settings.mode) return;
-  settings.mode = mode; savePreferences(); startSession();
+  settings.mode = mode; savePreferences(); rankFilter = 'all'; page = 0; startSession(); renderLibrary();
 }
 function answerRows(card) {
   const main = settings.mode === 'write'
@@ -125,43 +147,63 @@ function questionMarkup(card) {
   }
   return `<p class="question-word reverse" lang="ja">${esc(answerFields(card, activeDeck).map(field => field.text).join('\n'))}</p>`;
 }
+function assessmentButtons(selectedRating = null) {
+  return `${settings.mode === 'write' ? '<p class="assessment-heading">手ごたえは？</p>' : ''}<div class="assessment-buttons" role="group" aria-label="今回の自己評価">${RATINGS.map(item => `<button type="button" class="assessment-button rating-${item.id}" data-rating="${item.id}" aria-label="${esc(item.symbol)} ${esc(item.label)}"${selectedRating ? ` aria-pressed="${item.id === selectedRating}"` : ''}><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span></button>`).join('')}</div>`;
+}
+function assessmentHistory(card) {
+  const history = record(card).assessments?.[settings.mode]?.history;
+  if (!Array.isArray(history) || !history.length) return '';
+  return `<details class="assessment-history"><summary>これまでの評価 <span>${history.length}回</span></summary><div>${history.slice(-8).reverse().map(event => {
+    const item = ratingById.get(event.rating) || UNSEEN;
+    const at = new Date(event.at);
+    const date = Number.isFinite(at.getTime()) ? at.toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    return `<span class="history-entry rating-${item.id}" title="${esc(item.label)}"><strong>${item.symbol}</strong><time>${date}</time>${settings.mode === 'write' && typeof event.correct === 'boolean' ? `<small>${event.correct ? '正解' : '不正解'}</small>` : ''}</span>`;
+  }).join('')}</div></details>`;
+}
 function renderCard() {
   const el = $('#flashcard'); el.setAttribute('aria-busy', String(!loaded)); el.dataset.mode = settings.mode; el.classList.toggle('revealed', revealed);
   if (!loaded) return;
   if (!cards.length) { el.innerHTML = '<div class="empty-state"><h2>データを読み込めませんでした</h2><button class="button primary" data-action="reload">再読み込み</button></div>'; return; }
   if (!session.length) { el.innerHTML = '<div class="empty-state"><h2>該当するカードがありません</h2><button class="button primary" data-action="settings">出題設定を変更</button></div>'; return; }
   if (position >= session.length) { renderComplete(el); return; }
-  const card = session[position], current = record(card), writing = settings.mode === 'write';
+  const card = session[position], writing = settings.mode === 'write';
   let actions;
   if (writing) {
     actions = writeResult === null
-      ? `<button type="submit" form="write-form" class="reveal-button" id="check-writing">答えを確認</button><button type="button" class="text-button" data-action="skip-writing">答えを見る</button>`
-      : '<button id="next-writing" class="reveal-button" data-action="advance">次へ</button>';
+      ? `<button type="submit" form="write-form" class="reveal-button" id="check-writing">書いた答えを採点</button><button type="button" class="text-button" data-action="skip-writing">わからない・正解を見る</button>`
+      : `${assessmentButtons(answers.get(card.id)?.rating)}<button id="next-writing" class="text-button assessment-next" data-action="advance">この評価で次へ ${icon('arrow')}</button>`;
   } else if (!revealed) actions = '<button id="reveal-card" class="reveal-button" data-action="reveal">答えを見る</button>';
-  else actions = `<div class="rating-buttons${current.rank === 'fair' ? ' three' : ''}"><button id="rate-again" class="rating-review" data-action="again">もう一度</button>${current.rank === 'fair' ? '<button class="rating-fair" data-action="stay-fair">練習中のまま</button>' : ''}<button id="rate-right" class="rating-right" data-action="right">${current.rank === 'fair' ? '覚えた' : '答えられた'}</button></div>`;
-  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}</span></div>${badge(current.rank)}</div><div class="question-area">${questionMarkup(card)}${writing && writeResult === null ? '<form id="write-form" class="write-form"><label class="sr-only" for="hangul-input">韓国語の答え</label><input id="hangul-input" placeholder="韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" required></form>' : ''}</div>${writing && writeResult !== null ? `<div class="result-banner${writeResult ? '' : ' wrong'}" role="status">${writeResult ? '正解' : '不正解'}</div>${submitted && !writeResult ? `<p class="write-submission">入力した答え：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>`;
+  else actions = assessmentButtons();
+  const input = writing && writeResult === null ? '<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" required></form>' : '';
+  const result = writing && writeResult !== null ? `<div class="result-banner${writeResult ? '' : ' wrong'}" role="status">${icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult ? '正解' : '不正解'}</strong><span>自動採点</span></div>${submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
+  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}</span></div>${badge(rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}</div>` : ''}<div class="card-action-area">${actions}</div>`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
   const retry = session.filter(card => answers.get(card.id)?.passed === false);
-  el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${session.length}枚中 ${right}枚正解</p><div class="complete-actions">${retry.length ? `<button class="button secondary" data-action="retry">間違えた${retry.length}枚を再演習</button>` : ''}<button class="button primary" data-action="next-set">次のセット</button></div></div>`;
+  el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${session.length}枚中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions">${retry.length ? `<button class="button secondary" data-action="retry">間違えた${retry.length}枚を再演習</button>` : ''}<button class="button primary" data-action="next-set">次のセット</button></div></div>`;
 }
 function reveal() {
   if (!session[position] || revealed || settings.mode !== 'read') return;
-  revealed = true; renderCard(); $('#rate-right')?.focus({ preventScroll: true });
+  revealed = true; renderCard(); $('.assessment-button')?.focus({ preventScroll: true });
 }
-function finishRecall(passed, { stay = false } = {}) {
-  const card = session[position]; if (!card || !revealed || settings.mode !== 'read') return;
-  let next = recordRecall(record(card), 'ko-han', passed);
-  if (stay) next = setRank(next, 'fair');
-  records[card.id] = next; answers.set(card.id, { passed, rank: next.rank }); saveRecords(); advance();
+function rateCard(rating) {
+  const card = session[position];
+  if (!card || !revealed || !RATINGS.some(item => item.id === rating)) return;
+  const writing = settings.mode === 'write';
+  if (writing && writeResult === null) return;
+  records[card.id] = recordAssessment(record(card), settings.mode, rating, { correct: null, countAttempt: !writing });
+  const passed = writing ? answers.get(card.id)?.passed === true : ['good','solid'].includes(rating);
+  answers.set(card.id, { ...answers.get(card.id), passed, rating });
+  saveRecords(); advance();
 }
 function checkWriting(skipped = false) {
   const card = session[position]; if (!card || writeResult !== null || composing || settings.mode !== 'write') return;
   const input = $('#hangul-input'); submitted = input?.value.trim() || '';
   if (!skipped && !submitted) { input?.reportValidity(); return; }
   const passed = !skipped && (activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : matchHangul(submitted, card.han));
-  records[card.id] = recordWriting(record(card), passed); answers.set(card.id, { passed, rank: records[card.id].rank });
+  const rating = passed ? 'good' : 'again';
+  records[card.id] = recordAssessment(record(card), 'write', rating, { correct: passed }); answers.set(card.id, { passed, rating });
   writeResult = passed; revealed = true; saveRecords(); renderOverview(); renderCard(); $('#next-writing')?.focus({ preventScroll: true });
 }
 function advance() {
@@ -190,10 +232,9 @@ function renderLibrary() {
     const hideHan = mask && settings.libraryDirection === 'han-ko', hideMean = mask && settings.libraryDirection === 'ko-han';
     const accessibleName = hideHan ? 'このカード' : esc(card.han);
     const revealButton = `<button class="masked-answer" data-reveal-row="${id}">表示</button>`;
-    const options = RANKS.map(item => `<option value="${item.id}"${item.id === current ? ' selected' : ''}>${esc(item.label)}</option>`).join('');
     const fields = answerFields(card, activeDeck);
     const text = fields.map((field, index) => index ? `<small lang="${field.lang}">${esc(field.text)}</small>` : `<span lang="${field.lang}">${esc(field.text)}</span>`).join('');
-    return `<tr><td><input type="checkbox" data-select-card="${id}" aria-label="${accessibleName}を選ぶ"${selected.has(card.id) ? ' checked' : ''}></td><td class="han-cell">${hideHan ? revealButton : `<span lang="ko">${esc(card.han)}</span>`}</td><td class="meaning-cell">${hideMean ? revealButton : text}</td><td><select class="rank-select rank-${current}" data-set-rank="${id}" aria-label="${accessibleName}のランク">${options}</select></td><td><button class="table-queue" data-queue-card="${id}" aria-label="${accessibleName}で演習">演習</button></td></tr>`;
+    return `<tr><td><input type="checkbox" data-select-card="${id}" aria-label="${accessibleName}を選ぶ"${selected.has(card.id) ? ' checked' : ''}></td><td class="han-cell">${hideHan ? revealButton : `<span lang="ko">${esc(card.han)}</span>`}</td><td class="meaning-cell">${hideMean ? revealButton : text}</td><td>${badge(current)}</td><td><button class="table-queue" data-queue-card="${id}" aria-label="${accessibleName}で演習">演習</button></td></tr>`;
   }).join('') : '<tr><td colspan="5" class="empty-row">該当するカードがありません</td></tr>';
   $('#page-info').textContent = matching.length ? `${page * pageSize + 1} – ${Math.min((page + 1) * pageSize, matching.length)} / ${matching.length}枚` : '0枚';
   $('#prev-page').disabled = page === 0; $('#next-page').disabled = (page + 1) * pageSize >= matching.length;
@@ -250,12 +291,9 @@ async function refreshRemote() {
   } catch { notice('教材の更新を確認できませんでした。今の教材で演習を続けられます。'); }
   finally { polling = false; }
 }
-function openSettings() { syncSettingsForm(); $('#practice-settings').showModal(); }
+function openSettings() { syncSettingsForm(); renderSettings(); $('#practice-settings').showModal(); }
 function handleCardAction(action) {
   if (action === 'reveal') reveal();
-  else if (action === 'right') finishRecall(true);
-  else if (action === 'again') finishRecall(false);
-  else if (action === 'stay-fair') finishRecall(true, { stay: true });
   else if (action === 'advance') advance();
   else if (action === 'skip-writing') checkWriting(true);
   else if (action === 'reload') location.reload();
@@ -275,6 +313,7 @@ function bind() {
     if (target.dataset.mode && loaded) switchMode(target.dataset.mode);
     if (target.dataset.view) setView(target.dataset.view);
     if (target.dataset.action) handleCardAction(target.dataset.action);
+    if (target.dataset.rating) rateCard(target.dataset.rating);
     if (target.dataset.rankFilter) filteredLibrary(target.dataset.rankFilter);
     if (target.dataset.rankTile) filteredLibrary(target.dataset.rankTile);
     if (target.dataset.revealRow) { revealedRows.add(target.dataset.revealRow); renderLibrary(); }
@@ -292,9 +331,31 @@ function bind() {
   $('#new-session').onclick = () => startSession();
   $('#open-settings').onclick = openSettings;
   $('#close-settings').onclick = () => $('#practice-settings').close();
+  $('#settings-form').onclick = event => {
+    const target = event.target.closest('button'); if (!target) return;
+    let focusSelector;
+    if (target.dataset.settingsRating) {
+      const id = target.dataset.settingsRating;
+      draftSettings.ratings = draftSettings.ratings.includes(id) ? draftSettings.ratings.filter(value => value !== id) : [...draftSettings.ratings, id];
+      focusSelector = `[data-settings-rating="${id}"]`;
+    } else if (target.dataset.preset) {
+      draftSettings.ratings = target.dataset.preset === 'weak' ? ['hard','again','unsure'] : target.dataset.preset === 'new' ? ['unseen'] : STATUSES.map(item => item.id);
+      draftSettings.recentMistakesDays = 0; draftSettings.excludeRecentDays = 0;
+      focusSelector = `[data-preset="${target.dataset.preset}"]`;
+    } else if (target.dataset.choice) {
+      const field = target.dataset.choice, raw = target.dataset.choiceValue;
+      draftSettings[field] = field === 'shuffle' ? raw === 'true' : field === 'limit' ? raw : Number(raw);
+      focusSelector = `[data-choice="${field}"][data-choice-value="${raw}"]`;
+    } else if (target.id === 'reset-settings') {
+      draftSettings = practiceSettings({ mode: settings.mode, libraryDirection: settings.libraryDirection, shuffle: true });
+      focusSelector = '#reset-settings';
+    } else return;
+    renderSettings(); $(focusSelector)?.focus({ preventScroll: true });
+  };
   $('#settings-form').onsubmit = event => {
-    event.preventDefault(); settings = practiceSettings({ ...settings, filter: $('#practice-filter').value, limit: $('#session-limit').value, shuffle: $('#shuffle').checked });
-    savePreferences(); $('#practice-settings').close(); startSession();
+    event.preventDefault(); if (!filterAssessments(cards, records, draftSettings).length) return;
+    settings = practiceSettings({ ...draftSettings, filter: 'all' });
+    savePreferences(); $('#practice-settings').close(); startSession(); setView('study'); renderLibrary();
   };
   $('#library-search').oninput = () => { page = 0; renderLibrary(); };
   $('#library-hide').onchange = () => { revealedRows.clear(); renderLibrary(); };
@@ -302,10 +363,7 @@ function bind() {
   $('#library-body').onchange = event => {
     const el = event.target;
     if (el.dataset.selectCard) { if (el.checked) selected.add(el.dataset.selectCard); else selected.delete(el.dataset.selectCard); updateSelection(); }
-    if (el.dataset.setRank) {
-      const card = cards.find(item => item.id === el.dataset.setRank);
-      if (card) { records[card.id] = setRank(record(card), el.value); saveRecords(); renderOverview(); renderLibrary(); }
-    }
+
   };
   $('#select-page').onchange = event => { pageCards.forEach(card => { if (event.target.checked) selected.add(card.id); else selected.delete(card.id); }); renderLibrary(); };
   $('#queue-selected').onclick = () => practiceSelected(new Set(selected));
@@ -315,7 +373,7 @@ function bind() {
     if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open) return;
     const target = event.target; if (target.closest('input,select,textarea,[contenteditable=true]')) return;
     if (event.code === 'Space' && !revealed && (!target.closest('button,a') || target.closest('#reveal-card'))) { event.preventDefault(); reveal(); }
-    else if (revealed && ['1', '2'].includes(event.key)) { event.preventDefault(); finishRecall(event.key === '2'); }
+    else if (revealed && /^[1-5]$/.test(event.key)) { event.preventDefault(); rateCard(RATINGS[Number(event.key) - 1].id); }
   });
 }
 async function init() {

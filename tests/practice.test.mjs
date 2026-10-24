@@ -39,8 +39,8 @@ test('new mode preferences override old stage/direction and old choices migrate 
   assert.equal(resolvePracticeMode({}), 'read');
   assert.equal(resolvePracticeMode(null), 'read');
   assert.equal(practiceSettings(null).filter, 'all');
-  assert.deepEqual(practiceSettings({}), { mode: 'read', filter: 'all', limit: '10', shuffle: false, libraryDirection: 'ko-han' });
-  assert.deepEqual(practiceSettings({ mode: 'write', filter: 'required', limit: 50, shuffle: true }), { mode: 'write', filter: 'required', limit: '50', shuffle: true, libraryDirection: 'ko-han' });
+  assert.deepEqual(practiceSettings({}), { mode: 'read', filter: 'all', limit: '10', shuffle: false, libraryDirection: 'ko-han', ratings: ['hard', 'again', 'unsure', 'good', 'solid', 'unseen'], recentMistakesDays: 0, excludeRecentDays: 0 });
+  assert.deepEqual(practiceSettings({ mode: 'write', filter: 'required', limit: 50, shuffle: true }), { mode: 'write', filter: 'required', limit: '50', shuffle: true, libraryDirection: 'ko-han', ratings: ['unseen'], recentMistakesDays: 0, excludeRecentDays: 0 });
 });
 
 test('selecting cards for practice can preserve their shared ranks and direction histories', () => {
@@ -51,4 +51,13 @@ test('selecting cards for practice can preserve their shared ranks and direction
   assert.equal(pool[0].id, card.id);
   assert.equal(selectedRecords[card.id].rank, 'later');
   assert.equal(selectedRecords[card.id].attempts['han-ko'].right, 1);
+});
+
+test('status settings validate multi-selection, history periods and legacy filters', () => {
+  assert.deepEqual(practiceSettings({ ratings: ['again', 'solid', 'bad', 'again'], recentMistakesDays: 7, excludeRecentDays: '3' }).ratings, ['again', 'solid']);
+  assert.equal(practiceSettings({ recentMistakesDays: 7 }).recentMistakesDays, 7);
+  assert.equal(practiceSettings({ excludeRecentDays: 2 }).excludeRecentDays, 0);
+  assert.deepEqual(practiceSettings({ filter: 'review' }).ratings, ['hard', 'again', 'unsure']);
+  assert.equal(practicePool(cards, records, practiceSettings({ ratings: [] })).length, 0);
+  assert.deepEqual(practicePool(cards, records, practiceSettings({ ratings: ['unsure'] })).map(card => card.state), ['fair']);
 });

@@ -9,8 +9,9 @@
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./assets/practice.css">
   <link rel="stylesheet" href="./assets/supporting.css">
+  <link rel="stylesheet" href="./assets/ratings.css?v=3">
   <script src="./assets/config.js" defer></script>
-  <script type="module" src="./assets/app.js"></script>
+  <script type="module" src="./assets/app.js?v=6"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -29,8 +30,6 @@
     <button data-deck="kanji" aria-pressed="false">漢字対応<span id="deck-kanji-count">650</span></button>
     <button data-deck="vocabulary" aria-pressed="true">単語暗記<span id="deck-vocabulary-count">4,559</span></button>
   </div>
-  <section id="study-view" class="view">
-    <h1 class="sr-only">演習</h1>
     <div class="mode-toolbar">
       <div class="mode-switch" role="group" aria-label="演習モード">
         <button data-mode="read" aria-pressed="true"><span data-icon="book"></span><span class="mode-copy"><strong>意味を答える</strong><small id="read-mode-caption">韓国語 → 日本語・英語</small></span></button>
@@ -38,6 +37,8 @@
       </div>
       <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="出題設定" title="出題設定"><span data-icon="sliders"></span><span>出題設定</span></button>
     </div>
+  <section id="study-view" class="view">
+    <h1 class="sr-only">演習</h1>
     <div class="practice-stage">
       <div class="session-bar" aria-label="演習の進捗">
         <span class="session-count"><span class="session-label">進捗</span><strong id="session-done">0</strong><span class="session-divider">/</span><span id="session-total">10</span></span>
@@ -50,31 +51,36 @@
   </section>
   <section id="library-view" class="view" hidden>
     <div class="page-heading"><h1>カード一覧</h1><span><strong id="library-total">—</strong>枚</span></div>
-    <div id="rank-filters" class="rank-filters" aria-label="ランクで絞り込み"></div>
+    <div id="rank-filters" class="status-filters" aria-label="評価で絞り込み"></div>
     <div class="library-toolbar">
       <label class="search-field"><span data-icon="search"></span><input id="library-search" type="search" aria-label="カードを検索" placeholder="検索" autocomplete="off"></label>
       <label class="check-label"><input id="library-hide" type="checkbox">答えを隠す</label>
       <button id="library-direction" class="button secondary" aria-label="隠す答えの方向">韓 → 訳</button>
     </div>
     <div class="selection-bar"><label class="check-label"><input id="select-page" type="checkbox">このページ</label><span id="selection-count">0枚選択</span><button id="queue-selected" class="button primary" disabled>選んだカードで演習</button></div>
-    <div class="table-wrap"><table><thead><tr><th scope="col"><span class="sr-only">選択</span></th><th scope="col">韓国語</th><th scope="col" id="library-answer-label">日本語・英語</th><th scope="col">ランク</th><th scope="col"><span class="sr-only">演習</span></th></tr></thead><tbody id="library-body"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th scope="col"><span class="sr-only">選択</span></th><th scope="col">韓国語</th><th scope="col" id="library-answer-label">日本語・英語</th><th scope="col">評価</th><th scope="col"><span class="sr-only">演習</span></th></tr></thead><tbody id="library-body"></tbody></table></div>
     <div class="pagination"><span id="page-info"></span><div><button id="prev-page" class="button secondary">← 前へ</button><button id="next-page" class="button secondary">次へ →</button></div></div>
   </section>
   <section id="progress-view" class="view" hidden>
     <div class="page-heading"><h1>学習記録</h1></div>
-    <div class="record-summary"><div><span>覚えたカード</span><strong id="settled-count">0</strong></div><div class="record-distribution"><div id="rank-distribution" class="rank-distribution"></div><strong id="settled-percent">0%</strong></div></div>
-    <div id="rank-board" class="rank-board"></div>
+    <div class="record-summary"><div><span>○・◎のカード</span><strong id="settled-count">0</strong></div><div class="record-distribution"><div id="rank-distribution" class="rank-distribution"></div><strong id="settled-percent">0%</strong></div></div>
+    <div id="rank-board" class="rank-board assessment-board"></div>
   </section>
 </main>
-<dialog id="practice-settings">
-  <div class="dialog-heading"><h2>出題設定</h2><button id="close-settings" class="icon-button" aria-label="閉じる">×</button></div>
+<dialog id="practice-settings" aria-labelledby="settings-title">
+  <div class="dialog-heading"><h2 id="settings-title">今日は、どれから？</h2><button id="close-settings" class="icon-button" aria-label="閉じる">×</button></div>
   <form id="settings-form">
-    <label class="field-label" for="practice-filter">範囲</label>
-    <select id="practice-filter"><option value="all">すべて</option><option value="review">復習（テスト待ち・練習中）</option><optgroup label="ランク"><option value="required">優先</option><option value="next">次に学ぶ</option><option value="later">あとで</option><option value="manji">テスト待ち</option><option value="fair">練習中</option><option value="mastered">覚えた</option><option value="read">読むテスト済み</option><option value="read2">定着</option></optgroup></select>
-    <label class="field-label" for="session-limit">枚数</label>
-    <select id="session-limit"><option value="10">10枚</option><option value="20">20枚</option><option value="50">50枚</option><option value="all">すべて</option></select>
-    <label class="check-label shuffle-label"><input id="shuffle" type="checkbox">ランダムに出題</label>
-    <button type="submit" class="button primary">適用する</button>
+    <div class="settings-content">
+      <section class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
+      <section class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div></section>
+      <section class="settings-section"><h3>何枚やる？</h3><div id="settings-limit" class="choice-row" role="group" aria-label="出題枚数"></div></section>
+      <section class="settings-section"><h3>出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
+      <details class="settings-advanced"><summary>復習をしぼる</summary>
+        <h3>過去に間違えたカード</h3><div id="settings-mistakes" class="choice-row" role="group" aria-label="間違えた期間"></div>
+        <h3>最近演習したカードを除く</h3><div id="settings-recent" class="choice-row" role="group" aria-label="最近の演習を除外"></div>
+      </details>
+    </div>
+    <div class="settings-footer"><span class="settings-match"><strong id="settings-match">0</strong> 枚が対象</span><button id="reset-settings" type="button" class="button secondary">リセット</button><button id="apply-settings" type="submit" class="button primary">演習を始める</button></div>
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" hidden></div>
