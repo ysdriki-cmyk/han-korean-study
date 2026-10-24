@@ -1,19 +1,18 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#c8e2df">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#80d8ff">
 <meta name="description" content="韓国語と日本語・英語、ハングルと漢字を行き来して覚える学習ノート。選ぶ、思い出す、読む、書くの4ステップ。">
 <title>한と漢 — ことばを育てる暗記ノート</title>
-<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./assets/styles.css">
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="./assets/styles.css"><link rel="stylesheet" href="./assets/theme-blue.css">
 <script src="./assets/config.js" defer></script><script type="module" src="./assets/app.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">学習へ移動</a>
 <aside class="sidebar">
 <a class="brand" href="#study" aria-label="한と漢 ホーム"><span class="brand-mark">한<span>漢</span></span><span class="brand-name">한と漢<small>ことばを育てる暗記ノート</small></span></a>
-<div class="sidebar-label">YOUR LITTLE STUDY ROOM</div>
+<div class="sidebar-label">学習メニュー</div>
 <nav class="main-nav" aria-label="メインメニュー"><button data-view="study" class="nav-item active"><span data-icon="cards"></span>学習する<span class="nav-arrow">↗</span></button><button data-view="library" class="nav-item"><span data-icon="grid"></span>ことば一覧<span id="nav-count" class="nav-count">—</span></button><button data-view="progress" class="nav-item"><span data-icon="layers"></span>記憶のきろく</button></nav>
-<div class="sidebar-note"><div class="mini-composition" aria-hidden="true"><span>한</span><i>↔</i><span>漢</span><b></b></div><p>わかる、から。<br>思い出せる、へ。</p><small>A LITTLE, EVERY DAY.</small></div>
 <div class="sidebar-bottom"><span class="save-dot"></span><span id="save-status">記録を自動で保存</span><button id="open-guide" class="icon-button" aria-label="学び方を見る"><span data-icon="info"></span></button></div>
 </aside>
 <div class="app-shell">
@@ -22,9 +21,8 @@
 <div id="notice" class="notice" role="status" hidden></div>
 <div class="course-bar"><span class="course-label">学習コース</span><div class="deck-switch" role="group" aria-label="学習コース"><button data-deck="vocabulary" aria-pressed="true"><strong>単語</strong><span>韓国語 ↔ 日本語・英語</span></button><button data-deck="kanji" aria-pressed="false"><strong>漢字</strong><span>ハングル ↔ 漢字・意味</span></button></div></div>
 <section id="study-view" class="view">
-<div class="study-hero"><div><p class="eyebrow">GROW YOUR WORDS</p><h1>ことばが、<br>自分のものになるまで。</h1><p class="page-description">選んで、思い出して、読んで、書いて。<br>あなたのペースで、記憶をひとつずつ。</p></div><div class="hero-art" aria-hidden="true"><span class="art-sun"></span><span class="art-card art-ko">한<small>HANGUL</small></span><span class="art-link">↔</span><span class="art-card art-han"><span id="art-answer">訳</span><small id="art-answer-kicker">MEANING</small></span><span class="art-flower">✳</span><span class="art-caption">ひとつの音から、広がることば。</span></div><div class="hero-date"><span id="today-date"></span><small>今日も、ひとつずつ。</small></div></div>
 <div id="stage-path" class="stage-path" aria-label="学習のステップ"></div>
-<div class="section-top"><div class="section-title"><span id="stage-index" class="small-index">02</span><h2 id="study-title">思い出すテスト</h2><span id="stage-label" class="stage-pill">テスト待ち → 練習中 → 覚えた</span></div><button class="text-link" id="choose-targets">学ぶことばを選ぶ ↗</button></div>
+<div class="section-top"><div class="section-title"><span id="stage-index" class="small-index">02</span><h1 id="study-title">思い出すテスト</h1><span id="stage-label" class="stage-pill">テスト待ち → 練習中 → 覚えた</span></div><button class="text-link" id="choose-targets">学ぶことばを選ぶ ↗</button></div>
 <div class="study-layout"><div class="study-main">
 <div id="direction-switch" class="direction-switch" role="group" aria-label="テストの方向"><button data-direction="ko-han" aria-pressed="true"><span>한</span><span id="forward-source">韓国語</span> <i>→</i> <span id="forward-answer">日本語・英語</span></button><button data-direction="han-ko" aria-pressed="false"><span id="reverse-mark">訳</span><span id="reverse-answer">日本語・英語</span> <i>→</i> <span id="reverse-target">韓国語</span></button></div>
 <div class="session-toolbar"><span id="pool-caption">次に覚えたいことば</span><div><label class="shuffle-control"><input type="checkbox" id="shuffle">ランダム</label><label><span class="sr-only">セットの枚数</span><select id="session-limit"><option value="10" selected>10枚ずつ</option><option value="20">20枚ずつ</option><option value="50">50枚ずつ</option><option value="all">すべて</option></select></label><button id="new-session" class="icon-button" aria-label="新しいセットを始める"><span data-icon="refresh"></span></button></div></div>
