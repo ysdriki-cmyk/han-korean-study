@@ -1,0 +1,167 @@
+/* Reference examples stay below the answer and grading controls. */
+.usage-reference {
+  min-width: 0;
+  padding: 24px 28px 28px;
+  border-top: 1px solid #e5eaf1;
+  background: #fff;
+}
+.usage-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 14px;
+}
+.usage-heading h3 {
+  margin: 0;
+  color: var(--ink, #263348);
+  font-size: 15px;
+  line-height: 1.6;
+  font-weight: 700;
+}
+.usage-source-tag {
+  color: #778397;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.usage-table-wrap {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dfe5ed;
+  border-radius: 10px;
+  background: #fff;
+}
+.usage-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  text-align: left;
+}
+.usage-table th,
+.usage-table td {
+  padding: 14px 16px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+}
+.usage-table tr > :nth-child(1) { width: 32%; }
+.usage-table tr > :nth-child(2) { width: 28%; }
+.usage-table tr > :nth-child(3) { width: 40%; }
+.usage-table thead th {
+  padding-top: 11px;
+  padding-bottom: 11px;
+  background: #f7f9fc;
+  color: #667085;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 600;
+}
+.usage-table tbody tr > * {
+  border-top: 1px solid #e8edf3;
+}
+.usage-table tbody th {
+  color: #263348;
+  font-family: 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 500;
+}
+.usage-table tbody td {
+  color: #526075;
+  font-size: 13px;
+  line-height: 1.8;
+  font-weight: 400;
+}
+.usage-word {
+  color: #263348;
+  font-family: 'Noto Sans KR', 'Noto Sans JP', sans-serif;
+  font-size: 17px;
+  line-height: 1.7;
+  font-weight: 500;
+}
+.usage-table .usage-sentence {
+  margin: 9px 0 0;
+  padding-top: 9px;
+  border-top: 1px solid #edf0f5;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.8;
+  font-weight: 400;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.usage-sentence-label {
+  display: block;
+  margin-bottom: 3px;
+  color: #8a95a5;
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+.usage-hit {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: #fff0be;
+  color: inherit;
+}
+.usage-more { margin-top: 12px; }
+.usage-more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 9px 14px;
+  border: 1px solid #d9e4f3;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #3c72bc;
+  font-size: 13px;
+  line-height: 1.6;
+  cursor: pointer;
+  list-style: none;
+}
+.usage-more > summary::-webkit-details-marker { display: none; }
+.usage-more > summary::after { content: '+'; font-size: 17px; line-height: 1; }
+.usage-more[open] > summary { margin-bottom: 12px; }
+.usage-more[open] > summary::after { content: '−'; }
+.usage-more > summary:hover { border-color: #a5c3ec; background: #eff6ff; }
+.usage-empty,
+.usage-error {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.usage-error + .button,
+.usage-error .button { margin-top: 10px; }
+
+@media (max-width: 720px) {
+  .usage-reference { padding: 20px 16px 22px; }
+  .usage-heading { margin-bottom: 12px; gap: 6px 12px; }
+  .usage-heading h3 { font-size: 14px; }
+  .usage-source-tag { font-size: 12px; }
+  .usage-table th,
+  .usage-table td { padding: 12px 9px; }
+  .usage-table tr > :nth-child(1) { width: 33%; }
+  .usage-table tr > :nth-child(2) { width: 30%; }
+  .usage-table tr > :nth-child(3) { width: 37%; }
+  .usage-table thead th { padding: 10px 9px; font-size: 12px; }
+  .usage-table tbody th,
+  .usage-word { font-size: 15px; line-height: 1.75; }
+  .usage-table tbody td { font-size: 12px; line-height: 1.8; }
+  .usage-table .usage-sentence { margin-top: 8px; padding-top: 8px; font-size: 12px; line-height: 1.8; }
+  .usage-more > summary { min-height: 42px; font-size: 12px; }
+}
+
+@media (max-width: 374px) {
+  .usage-table th,
+  .usage-table td,
+  .usage-table thead th { padding-left: 7px; padding-right: 7px; }
+}

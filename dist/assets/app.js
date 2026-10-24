@@ -1,6 +1,8 @@
 import { makeSession } from './core.js';
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
-import { matchVocabularyAnswer } from './vocabulary.js';
+import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
+import { parseTopikExamples } from './topik.js';
+import { renderTopikUsage } from './topik-view.js';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment } from './assessment.js';
 import { practiceSettings, practicePool, restorePracticePreferences } from './practice.js?v=10';
@@ -17,6 +19,7 @@ const STATUSES = [...RATINGS, UNSEEN];
 const ratingById = new Map(STATUSES.map(item => [item.id, item]));
 const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '自信あり', unseen: '未演習' };
 let draftSettings = null;
+let topikExamples = [], topikState = 'loading';
 const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'study', activeDeck = 'kanji';
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
@@ -209,7 +212,7 @@ function renderCard() {
   else actions = assessmentButtons();
   const input = writing && writeResult === null ? '<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" required></form>' : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off"></textarea></div>` : '';
   const result = writing && writeResult !== null ? `<div class="result-banner${writeResult ? '' : ' wrong'}" role="status">${icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult ? '正解' : '不正解'}</strong><span>自動採点</span></div>${submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${session.slice(0, position).some(item => item.id === card.id) ? ' · 復習' : ''}</span></div>${badge(rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${writing ? reviewNote(card) : ''}</div>` : ''}<div class="card-action-area">${actions}</div>`;
+  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${session.slice(0, position).some(item => item.id === card.id) ? ' · 復習' : ''}</span></div>${badge(rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${writing ? reviewNote(card) : ''}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
@@ -309,6 +312,25 @@ async function fetchText(url, deckId) {
 function restoreRecords() {
   records = restoreLearningRecords(readJSON(RECORD_KEY, null), readJSON('han-hanja:learning:v2', null), readJSON('han-hanja:progress:v1', {})); saveRecords();
 }
+async function loadTopikExamples() {
+  const controller = new AbortController(), timer = setTimeout(() => controller.abort(), config.fetchTimeoutMs || 10000);
+  try {
+    const response = await fetch('./data/topik1.csv', { signal: controller.signal, cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) throw new Error('使用参考例を取得できませんでした。');
+    const text = await response.text();
+    if (text.length > 3 * 1024 * 1024) throw new Error('使用参考例のサイズを確認してください。');
+    const result = parseTopikExamples(text);
+    if (!result.examples.length) throw new Error('使用参考例がありません。');
+    return result.examples;
+  } finally { clearTimeout(timer); }
+}
+async function retryTopikExamples() {
+  if (topikState === 'loading') return;
+  topikState = 'loading'; renderCard();
+  try { topikExamples = await loadTopikExamples(); topikState = 'ready'; }
+  catch { topikState = 'error'; }
+  renderCard();
+}
 async function loadCourse(id) {
   const source = courseConfig(id);
   if (source.csvUrl) { try { return await fetchText(source.csvUrl, id); } catch { notice('更新データを取得できないため、保存済みの教材を表示しています。'); } }
@@ -335,6 +357,7 @@ function handleCardAction(action) {
   else if (action === 'advance') advance();
   else if (action === 'skip-writing') checkWriting(true);
   else if (action === 'reload') location.reload();
+  else if (action === 'reload-examples') retryTopikExamples();
   else if (action === 'settings') openSettings();
   else if (action === 'retry') startSession(failedCards(), { all: true });
   else if (action === 'next-set') {
@@ -426,6 +449,10 @@ async function init() {
   preferences = restorePracticePreferences(readJSON(PREF_KEY, null), readJSON('han-hanja:preferences:v3', null));
   activeDeck = getDeck(preferences.deckId || config.defaultDeck).id; settings = practiceSettings(preferences.courses[activeDeck]);
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
+  // Reference examples load independently so a failed reference never blocks practice.
+  loadTopikExamples().then(examples => { topikExamples = examples; topikState = 'ready'; })
+    .catch(() => { topikState = 'error'; })
+    .finally(() => { if (loaded && revealed) renderCard(); });
   const results = await Promise.allSettled(DECKS.map(deck => loadCourse(deck.id)));
   results.forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(DECKS[index].id, result.value); });
   if (!deckData.has(activeDeck) && deckData.size) {
