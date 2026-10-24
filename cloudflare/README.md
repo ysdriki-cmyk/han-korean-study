@@ -1,0 +1,51 @@
+# 管理者向け: Cloudflare Pagesで教材を連携する
+
+利用者は学習操作をWebサイト内で完結できます。教材CSV、Google Sheetsの接続先、更新間隔は管理者が配信時に設定し、利用者の画面にファイル入出力や接続設定を設けません。
+
+## Pagesへ配置する
+
+| 設定 | 値 |
+| --- | --- |
+| ルートディレクトリ | この `han-korean-study` フォルダ |
+| フレームワーク | なし |
+| ビルドコマンド | 空欄 |
+| 出力ディレクトリ | `dist` |
+
+`functions/` は `dist/` の外、プロジェクトのルートに置きます。`functions/api/cards.js` が `/api/cards` に対応します。[Cloudflare公式: Functionsの作成](https://developers.cloudflare.com/pages/functions/get-started/)、[ルーティング](https://developers.cloudflare.com/pages/functions/routing/)
+
+アプリ本体だけなら静的配信で動きます。以下のFunctionは、Google Sheetsを同じオリジンから取得したい場合だけ使う任意の追加機能です。静的サイトを配信しただけではFunctionは起動しません。
+
+## 教材接続を設定する
+
+1. Google Sheetsの教材タブをCSV形式で公開します。
+2. Pagesの環境変数 **`SHEET_CSV_URL`** に公開URLを設定します。ProductionとPreviewはそれぞれ設定してください。
+3. `dist/assets/config.js` の `window.APP_CONFIG.csvUrl` を `/api/cards` に設定します。
+4. 再デプロイします。以後はアプリが設定された教材を読み込みます。
+
+```text
+https://docs.google.com/spreadsheets/d/e/公開ID/pub?gid=0&single=true&output=csv
+```
+
+`https://docs.google.com/spreadsheets/d/シートID/export?format=csv&gid=0` 形式も受け付けます。認証を必要としない教材用のシートを指定してください。管理者が公開CSVへ直接接続する構成にする場合は、`csvUrl` にそのURLを設定し、Functionを省略できます。
+
+更新間隔は `config.js` の `refreshIntervalMs`、ブラウザの取得時間の上限は `fetchTimeoutMs` で管理します。利用者による接続操作は不要です。Googleの公開版への更新には数分かかる場合があるため、定期取得でも即時反映は保証できません。[Google公式の更新について](https://support.google.com/docs/answer/183965?hl=ja)
+
+通常の `npm run dev` は静的サーバーです。ローカルでFunctionも確認する場合は、Wranglerのある環境でプロジェクトルートから `npx wrangler pages dev dist` を実行し、ローカル用の `SHEET_CSV_URL` を設定します。ローカルの環境変数ファイルはGitに含めません。
+
+## 読み取りAPIの範囲
+
+- `GET /api/cards` と `HEAD /api/cards` のみ。教材の変更や学習記録の送信は行いません。
+- 取得先はサーバー側の `SHEET_CSV_URL` だけです。リクエストのURL引数による任意サイトの中継はしません。
+- HTTPSのGoogle Sheets CSV URLを検証し、Googleの配信用ホスト以外へのリダイレクトを拒否します。
+- 上流の取得は12秒で打ち切り、CSVは3 MiBまで受け付けます。HTMLのログイン画面はエラーにします。
+- 応答に `Cache-Control: no-store` を付けます。Google側の公開更新の遅れは除けません。
+
+未設定なら503、取得失敗・タイムアウトなら502、書き込み要求なら405です。環境変数の値や内部エラー本文は応答に含めません。
+
+## 学習記録と将来の同期
+
+現在の連携は **Sheets → アプリ** の教材読み取りです。共通ランクと方向別の学習記録は各ブラウザに保存され、スプレッドシートには書き戻しません。利用者のファイル操作をなくしても、端末間の同期が追加されるわけではありません。
+
+端末間で共有する段階では、利用者認証と、カードIDをキーにした学習記録テーブルを追加します。スプレッドシートへの書き戻しには、サーバー側のGoogle Sheets API認証、更新権限、競合解決も必要です。サービスアカウント鍵やAPIトークンは `dist/` や公開JavaScriptに置きません。
+
+このコードを追加しただけでは、利用者のCloudflareアカウントやGoogle Sheetsには接続されません。管理者による実際のURL・環境変数の設定と配信が必要です。
