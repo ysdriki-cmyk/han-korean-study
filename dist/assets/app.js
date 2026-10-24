@@ -3,7 +3,7 @@ import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from 
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { RANKS, getRecord, setRank, recordRecall, recordWriting, matchHangul } from './learning.js';
 import { practiceSettings, practicePool } from './practice.js';
-import { icon } from './icons.js';
+import { icon } from './icons.js?v=2';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -86,6 +86,8 @@ function renderSessionStats() {
   $('#session-done').textContent = answers.size; $('#session-total').textContent = session.length;
   $('#session-score').textContent = `正解 ${right}`;
   $('#session-progress').style.width = `${session.length ? answers.size / session.length * 100 : 0}%`;
+  $('.session-progress').setAttribute('aria-valuemax', String(session.length));
+  $('.session-progress').setAttribute('aria-valuenow', String(answers.size));
 }
 function syncSettingsForm() {
   $('#practice-filter').value = settings.filter; $('#session-limit').value = settings.limit; $('#shuffle').checked = settings.shuffle;

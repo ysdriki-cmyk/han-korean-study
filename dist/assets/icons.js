@@ -1,4 +1,7 @@
 const icons = {
+  book: '<path d="M12 5c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-4-1-7-1-10 1Zm0 0v15"/>',
+  pen: '<path d="m15 5 4 4M4 20l5-1L21 7a2.8 2.8 0 0 0-4-4L5 15l-1 5ZM4 20h16"/>',
+  chart: '<path d="M4 3v18h17M9 15v-4m5 4V6m5 9V9"/>',
   cards: '<rect x="5" y="7" width="15" height="14" rx="2"/><path d="m3 16-1-11a2 2 0 0 1 2-2l12-1"/><path d="M9 12h7M9 16h5"/>',
   grid: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 9v12"/>',
   sliders: '<path d="M4 7h8m4 0h4M4 17h3m4 0h9"/><circle cx="14" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
