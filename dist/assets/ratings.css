@@ -23,8 +23,7 @@
 }
 .assessment-badge .rating-symbol { font-size: 16px; font-weight: 700; line-height: 1.3; }
 .assessment-badge.rating-hard .rating-symbol { font-size: 12px; letter-spacing: -3px; margin-right: 3px; }
-.assessment-heading { max-width: 740px; margin: 0 auto 12px; color: #667085; font-size: 13px; font-weight: 500; text-align: center; }
-.assessment-buttons { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 740px; margin: 0 auto; }
+.assessment-buttons { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; width: 100%; max-width: 740px; margin: 0 auto; }
 .assessment-button {
   position: relative;
   display: flex;
@@ -44,9 +43,18 @@
 .assessment-button:hover { border-color: var(--rating-ink, #6d798c); box-shadow: 0 3px 9px #2633480c; }
 .assessment-button:active { transform: translateY(1px); box-shadow: none; }
 .assessment-button[aria-pressed=true] { border-color: var(--rating-ink, #6d798c); box-shadow: 0 0 0 2px var(--rating-line, #d9e0e9); }
+.assessment-button:disabled { cursor: default; }
+.assessment-button:disabled:hover { border-color: var(--rating-line, #d9e0e9); box-shadow: 0 2px 3px #26334804; }
+.assessment-button:disabled[aria-pressed=true] { border-color: var(--rating-ink, #6d798c); box-shadow: 0 0 0 2px var(--rating-line, #d9e0e9); }
 .assessment-button .rating-symbol { display: block; font-size: 28px; font-weight: 700; line-height: 1.1; }
 .assessment-button.rating-hard .rating-symbol { font-size: 21px; letter-spacing: -3px; margin-right: 3px; }
 .assessment-button .rating-label { font-size: 12px; line-height: 1.5; font-weight: 600; text-align: center; overflow-wrap: anywhere; }
+.card-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; max-width: 740px; margin: 18px auto 0; }
+.card-navigation .button { min-height: 48px; min-width: 112px; padding: 12px 22px; border-radius: 10px; font-size: 15px; }
+.card-navigation .next-button { min-width: 160px; margin-left: auto; box-shadow: 0 3px 7px #2879ec24; }
+.card-navigation .button:disabled { cursor: default; opacity: .4; box-shadow: none; }
+.card-navigation .button svg { width: 18px; height: 18px; }
+.previous-button svg { transform: rotate(180deg); }
 .status-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 20px; }
 .status-filters button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 8px 13px; border: 1px solid #dfe5ed; border-radius: 9px; background: white; color: #526176; font-size: 13px; }
 .status-filters button[aria-pressed=true] { background: #edf4ff; border-color: #96bdf4; color: #236ed8; }
@@ -117,12 +125,14 @@
 .settings-footer .button.primary { min-width: 130px; box-shadow: 0 3px 6px #2879ec1f; }
 
 @media (max-width: 720px) {
-  .assessment-buttons { gap: 7px; }
+  .assessment-buttons { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
   .assessment-button { min-height: 76px; border-radius: 9px; padding: 9px 3px; gap: 6px; }
   .assessment-button .rating-symbol { font-size: 26px; }
   .assessment-button.rating-hard .rating-symbol { font-size: 16px; letter-spacing: -4px; margin-right: 4px; }
-  .assessment-button .rating-label { font-size: 10px; line-height: 1.5; }
-  .assessment-heading { font-size: 12px; margin-bottom: 10px; }
+  .assessment-button .rating-label { font-size: 12px; line-height: 1.5; }
+  .card-navigation { margin-top: 16px; }
+  .card-navigation .button { min-height: 46px; min-width: 96px; padding: 11px 17px; font-size: 14px; }
+  .card-navigation .next-button { min-width: 144px; }
   .assessment-badge { padding: 4px 7px; gap: 5px; font-size: 11px; }
   .assessment-badge .rating-symbol { font-size: 14px; }
   .assessment-badge.rating-hard .rating-symbol { font-size: 11px; }
@@ -154,6 +164,9 @@
 }
 @media (max-width: 374px) {
   .assessment-buttons { gap: 5px; }
+  .card-navigation { gap: 10px; }
+  .card-navigation .button { min-width: 88px; padding-left: 13px; padding-right: 13px; }
+  .card-navigation .next-button { min-width: 132px; }
   .assessment-button .rating-symbol { font-size: 24px; }
   .assessment-button.rating-hard .rating-symbol { font-size: 14px; letter-spacing: -3px; margin-right: 3px; }
   .assessment-button .rating-label { font-size: 10px; }
@@ -173,7 +186,6 @@
 .flashcard.revealed .answer-panel { padding: 16px 24px 2px; }
 .flashcard.revealed .answer-row { margin-bottom: 10px; }
 .flashcard.revealed .card-action-area { padding: 16px 28px 20px; }
-.flashcard.revealed .assessment-heading { margin-bottom: 8px; font-size: 12px; }
 .assessment-button { min-height: 70px; }
 .assessment-history { margin: 12px 28px 0; padding: 0 0 10px; text-align: left; }
 .assessment-history summary { display: flex; align-items: center; gap: 7px; width: max-content; max-width: 100%; color: #667085; font-size: 12px; cursor: pointer; }
@@ -189,6 +201,8 @@
 .result-banner { display: flex; align-items: center; gap: 8px; }
 .result-banner svg { width: 18px; height: 18px; }
 .result-banner > span { margin-left: auto; font-size: 12px; font-weight: 400; }
+.result-banner.unanswered { background: #f0f3f7; color: #6d798c; }
+.result-banner.unanswered > .rating-symbol { margin-left: 0; font-size: 19px; font-weight: 600; }
 .assessment-next { justify-content: center; align-items: center; }
 .settings-content { padding: 20px 28px; }
 .settings-section + .settings-section { margin-top: 18px; }

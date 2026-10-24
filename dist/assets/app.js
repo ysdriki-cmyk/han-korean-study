@@ -4,7 +4,7 @@ import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.j
 import { parseTopikExamples } from './topik.js';
 import { renderTopikUsage } from './topik-view.js';
 import { getRecord, matchHangul } from './learning.js';
-import { RATINGS, UNSEEN, ratingFor, recordAssessment } from './assessment.js';
+import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, restorePracticePreferences } from './practice.js?v=10';
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
 import { applyReviewSchedule, insertRetry, nextReviewFor } from './review.js';
@@ -17,13 +17,14 @@ const config = window.APP_CONFIG || {};
 const RECORD_KEY = 'han-hanja:learning:v3', PREF_KEY = 'han-hanja:preferences:v4';
 const STATUSES = [...RATINGS, UNSEEN];
 const ratingById = new Map(STATUSES.map(item => [item.id, item]));
-const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '自信あり', unseen: '未演習' };
+const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '完璧', unseen: '未回答' };
 let draftSettings = null;
 let topikExamples = [], topikState = 'loading';
 const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'study', activeDeck = 'kanji';
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
+let cardViews = new Map(), advancedPositions = new Set();
 let answers = new Map(), cycleSeen = new Set(), hintSeeds = new Map(), initialCount = 0, sessionScope = 'essential';
 let rankFilter = 'all', page = 0, selected = new Set(), revealedRows = new Set(), pageCards = [];
 let loaded = false, storageAvailable = true, polling = false, composing = false, compositionEndedAt = 0, toastTimer;
@@ -76,7 +77,7 @@ function updateCourseChrome() {
   $('#library-answer-label').textContent = target;
   const searchText = activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
   $('#library-search').placeholder = searchText; $('#library-search').setAttribute('aria-label', searchText);
-  document.title = `한と漢 — ${activeDeck === 'vocabulary' ? '単語暗記' : '漢字対応'}`;
+  document.title = `한と漢 — ${activeDeck === 'vocabulary' ? '単語' : '한ー漢'}`;
 }
 function renderOverview() {
   const totals = counts(), mastered = totals.good + totals.solid;
@@ -88,7 +89,7 @@ function renderOverview() {
   $('#rank-distribution').setAttribute('role', 'img');
   $('#rank-distribution').setAttribute('aria-label', STATUSES.map(item => `${item.label}${totals[item.id]}枚`).join('、'));
   $('#rank-board').innerHTML = STATUSES.map(item => `<button class="rank-tile rating-${item.id}" data-rank-tile="${item.id}">${badge(item.id)}<strong>${totals[item.id].toLocaleString('ja-JP')}<small>枚</small></strong></button>`).join('');
-  $('#rank-filters').innerHTML = `<button data-rank-filter="all" aria-pressed="${rankFilter === 'all'}">すべて <strong>${cards.length.toLocaleString('ja-JP')}</strong></button>` + STATUSES.map(item => `<button class="rating-${item.id}" data-rank-filter="${item.id}" aria-pressed="${rankFilter === item.id}" aria-label="${esc(item.label)} ${totals[item.id]}枚"><span class="rating-symbol">${item.symbol}</span>${item.id === 'unseen' ? '<span>未演習</span>' : ''}<strong>${totals[item.id].toLocaleString('ja-JP')}</strong></button>`).join('');
+  $('#rank-filters').innerHTML = `<button data-rank-filter="all" aria-pressed="${rankFilter === 'all'}">すべて <strong>${cards.length.toLocaleString('ja-JP')}</strong></button>` + STATUSES.map(item => `<button class="rating-${item.id}" data-rank-filter="${item.id}" aria-pressed="${rankFilter === item.id}" aria-label="${esc(item.label)} ${totals[item.id]}枚"><span class="rating-symbol">${item.symbol}</span>${item.id === 'unseen' ? '<span>未回答</span>' : ''}<strong>${totals[item.id].toLocaleString('ja-JP')}</strong></button>`).join('');
   renderSessionStats();
 }
 function renderSessionStats() {
@@ -133,7 +134,7 @@ function startSession(custom = null, { continuing = false, all = false } = {}) {
   session = makeSession(custom ?? pool(), { limit: all ? 'all' : settings.limit, shuffle: settings.shuffle });
   initialCount = session.length; sessionScope = settings.scope;
   hintSeeds = new Map(session.map(card => [card.id, Math.floor(Math.random() * Math.max(1, kanjiPromptChoices(card).length))]));
-  position = 0; revealed = false; writeResult = null; submitted = ''; answers = new Map();
+  position = 0; revealed = false; writeResult = null; submitted = ''; answers = new Map(); cardViews = new Map(); advancedPositions = new Set();
   updateCourseChrome(); renderOverview(); renderCard();
 }
 function switchDeck(id) {
@@ -164,7 +165,7 @@ function currentKanjiHint(card) {
 function failedCards() {
   const latest = new Map();
   for (const result of answers.values()) latest.set(result.cardId, result);
-  return [...new Map(session.filter(card => latest.get(card.id)?.passed === false).map(card => [card.id, card])).values()];
+  return [...new Map(session.filter(card => { const result = latest.get(card.id); return result && (result.correct === false || ['hard', 'again'].includes(result.rating)); }).map(card => [card.id, card])).values()];
 }
 function reviewNote(card) {
   const review = nextReviewFor(record(card), settings.mode);
@@ -179,8 +180,24 @@ function questionMarkup(card) {
   }
   return `<p class="question-word reverse" lang="ja">${esc(currentKanjiHint(card))}</p>`;
 }
-function assessmentButtons(selectedRating = null) {
-  return `${settings.mode === 'write' ? '<p class="assessment-heading">手ごたえは？</p>' : ''}<div class="assessment-buttons" role="group" aria-label="今回の自己評価">${RATINGS.map(item => `<button type="button" class="assessment-button rating-${item.id}" data-rating="${item.id}" aria-label="${esc(item.symbol)} ${esc(item.label)}"${selectedRating ? ` aria-pressed="${item.id === selectedRating}"` : ''}><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span></button>`).join('')}</div>`;
+function assessmentButtons(selectedRating = null, locked = false) {
+  return `<div class="assessment-buttons" role="group" aria-label="今回の自己評価">${STATUSES.map(item => `<button type="button" class="assessment-button rating-${item.id}" data-rating="${item.id}" aria-label="${esc(item.symbol)} ${esc(item.label)}"${selectedRating ? ` aria-pressed="${item.id === selectedRating}"` : ''}${locked ? ' disabled' : ''}><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span></button>`).join('')}</div>`;
+}
+function cardNavigation() {
+  return `<div class="card-navigation"><button type="button" class="button secondary previous-button" data-action="previous"${position === 0 ? ' disabled' : ''}>${icon('arrow')}前へ</button><button type="button" id="next-writing" class="button primary next-button" data-action="advance"${answers.has(position) ? '' : ' disabled'}>次へ${icon('arrow')}</button></div>`;
+}
+function saveCardView() {
+  if (!session[position]) return;
+  if (!revealed) submitted = ($('#hangul-input') || $('#recall-input'))?.value || submitted;
+  cardViews.set(position, { revealed, writeResult, submitted });
+}
+function restoreCardView() {
+  const saved = cardViews.get(position);
+  revealed = saved?.revealed || false; writeResult = saved?.writeResult ?? null; submitted = saved?.submitted || '';
+  composing = false; compositionEndedAt = 0;
+}
+function focusCard() {
+  ($('#hangul-input') || $('#reveal-card') || $('.next-button:not(:disabled)') || $('.complete-actions .button'))?.focus({ preventScroll: true });
 }
 function assessmentHistory(card) {
   const history = record(card).assessments?.[settings.mode]?.history;
@@ -202,22 +219,21 @@ function renderCard() {
     el.innerHTML = `<div class="empty-state"><h2>${scheduled ? '今日の演習は完了' : 'この条件のカードはありません'}</h2>${scheduled ? `<p>次の復習：${new Date(scheduled).toLocaleDateString('ja-JP')}</p>` : ''}<button class="button primary" data-action="settings">出題設定を開く</button></div>`; return;
   }
   if (position >= session.length) { renderComplete(el); return; }
-  const card = session[position], writing = settings.mode === 'write';
+  const card = session[position], writing = settings.mode === 'write', locked = advancedPositions.has(position);
+  const selectedRating = answers.get(position)?.rating;
   let actions;
-  if (writing) {
-    actions = writeResult === null
-      ? `<button type="submit" form="write-form" class="reveal-button" id="check-writing">答えを見る・採点</button><button type="button" class="text-button" data-action="skip-writing">わからない・正解を見る</button>`
-      : `${assessmentButtons(answers.get(position)?.rating)}<button id="next-writing" class="text-button assessment-next" data-action="advance">この評価で次へ ${icon('arrow')}</button>`;
-  } else if (!revealed) actions = '<button id="reveal-card" class="reveal-button" data-action="reveal">答えを見る</button>';
-  else actions = assessmentButtons();
-  const input = writing && writeResult === null ? '<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" required></form>' : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off"></textarea></div>` : '';
-  const result = writing && writeResult !== null ? `<div class="result-banner${writeResult ? '' : ' wrong'}" role="status">${icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult ? '正解' : '不正解'}</strong><span>自動採点</span></div>${submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${session.slice(0, position).some(item => item.id === card.id) ? ' · 復習' : ''}</span></div>${badge(rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${writing ? reviewNote(card) : ''}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState) : ''}`;
+  if (writing && !revealed) actions = '<button type="submit" form="write-form" class="reveal-button" id="check-writing">答えを見る・採点</button>';
+  else if (!revealed) actions = '<button id="reveal-card" class="reveal-button" data-action="reveal">答えを見る</button>';
+  else actions = assessmentButtons(selectedRating, locked);
+  actions += cardNavigation();
+  const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}"></form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
+  const result = writing && revealed ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
+  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${session.slice(0, position).some(item => item.id === card.id) ? ' · 復習' : ''}</span></div>${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${writing ? reviewNote(card) : ''}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
   const retry = failedCards();
-  el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${initialCount}枚${session.length > initialCount ? `＋復習${session.length - initialCount}回` : ''} / ${session.length}回中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions">${retry.length ? `<button class="button secondary" data-action="retry">間違えた${retry.length}枚を再演習</button>` : ''}<button class="button primary" data-action="next-set">次のセット</button></div></div>`;
+  el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${initialCount}枚${session.length > initialCount ? `＋復習${session.length - initialCount}回` : ''} / ${session.length}回中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions"><button class="button secondary previous-button" data-action="previous">${icon('arrow')}前へ</button>${retry.length ? `<button class="button secondary" data-action="retry">間違えた${retry.length}枚を再演習</button>` : ''}<button class="button primary" data-action="next-set">次のセット</button></div></div>`;
 }
 function reveal() {
   if (!session[position] || revealed || settings.mode !== 'read') return;
@@ -225,31 +241,39 @@ function reveal() {
 }
 function rateCard(rating) {
   const card = session[position];
-  if (!card || !revealed || !RATINGS.some(item => item.id === rating)) return;
+  if (!card || !revealed || advancedPositions.has(position) || !ratingById.has(rating)) return;
   const writing = settings.mode === 'write';
-  if (writing && writeResult === null) return;
   records[card.id] = applyReviewSchedule(recordAssessment(record(card), settings.mode, rating, { correct: null, countAttempt: !writing }), settings.mode, rating);
   const passed = writing ? answers.get(position)?.passed === true : ['good','solid'].includes(rating);
   answers.set(position, { ...answers.get(position), cardId: card.id, passed, rating });
   saveRecords(); advance();
 }
-function checkWriting(skipped = false) {
-  const card = session[position]; if (!card || writeResult !== null || composing || settings.mode !== 'write') return;
-  const input = $('#hangul-input'); submitted = input?.value.trim() || '';
-  if (!skipped && !submitted) { input?.reportValidity(); return; }
-  const passed = !skipped && (activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : kanjiAnswersForPrompt(cards, currentKanjiHint(card)).some(answer => matchHangul(submitted, answer)));
-  const rating = passed ? 'good' : 'again';
-  records[card.id] = applyReviewSchedule(recordAssessment(record(card), 'write', rating, { correct: passed }), 'write', rating); answers.set(position, { cardId: card.id, passed, rating });
-  writeResult = passed; revealed = true; saveRecords(); renderOverview(); renderCard(); $('#next-writing')?.focus({ preventScroll: true });
+function checkWriting() {
+  const card = session[position]; if (!card || revealed || composing || settings.mode !== 'write') return;
+  submitted = $('#hangul-input')?.value.trim() || '';
+  const correct = submitted ? (activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : kanjiAnswersForPrompt(cards, currentKanjiHint(card)).some(answer => matchHangul(submitted, answer))) : null;
+  const rating = writingAssessment(rank(card), correct);
+  records[card.id] = applyReviewSchedule(recordAssessment(record(card), 'write', rating, { correct }), 'write', rating);
+  answers.set(position, { cardId: card.id, passed: correct === true, correct, rating });
+  writeResult = correct; revealed = true; saveRecords(); saveCardView(); renderOverview(); renderCard(); $('#next-writing')?.focus({ preventScroll: true });
 }
 function advance() {
+  if (!session[position] || !answers.has(position)) return;
+  saveCardView();
   const card = session[position], result = answers.get(position);
-  if (card && result) {
-    const retryRating = settings.mode === 'write' && !result.passed && !['hard', 'again'].includes(result.rating) ? 'again' : result.rating;
+  // Reviewing a completed position never creates an extra retry or assessment.
+  if (!advancedPositions.has(position)) {
+    const retryRating = settings.mode === 'write' && result.correct === false && !['hard', 'again'].includes(result.rating) ? 'again' : result.rating;
     session = insertRetry(session, position, card, retryRating).queue;
+    advancedPositions.add(position);
   }
-  position += 1; revealed = false; writeResult = null; submitted = ''; composing = false;
-  renderOverview(); renderCard(); ($('#reveal-card') || $('#hangul-input') || $('.complete-actions .button'))?.focus({ preventScroll: true });
+  position += 1; restoreCardView();
+  renderOverview(); renderCard(); focusCard();
+}
+function previous() {
+  if (position <= 0) return;
+  saveCardView(); position -= 1; restoreCardView();
+  renderOverview(); renderCard(); focusCard();
 }
 function setView(next, { hash = true } = {}) {
   view = ['study', 'library', 'progress'].includes(next) ? next : 'study';
@@ -355,7 +379,7 @@ function openSettings() { syncSettingsForm(); renderSettings(); $('#practice-set
 function handleCardAction(action) {
   if (action === 'reveal') reveal();
   else if (action === 'advance') advance();
-  else if (action === 'skip-writing') checkWriting(true);
+  else if (action === 'previous') previous();
   else if (action === 'reload') location.reload();
   else if (action === 'reload-examples') retryTopikExamples();
   else if (action === 'settings') openSettings();
@@ -379,6 +403,9 @@ function bind() {
     if (target.dataset.rankTile) filteredLibrary(target.dataset.rankTile);
     if (target.dataset.revealRow) { revealedRows.add(target.dataset.revealRow); renderLibrary(); }
     if (target.dataset.queueCard) practiceSelected(new Set([target.dataset.queueCard]));
+  });
+  $('#flashcard').addEventListener('input', event => {
+    if (['hangul-input', 'recall-input'].includes(event.target.id)) submitted = event.target.value;
   });
   $('#flashcard').addEventListener('compositionstart', () => { composing = true; });
   $('#flashcard').addEventListener('compositionend', () => { composing = false; compositionEndedAt = performance.now(); });
@@ -441,7 +468,7 @@ function bind() {
     if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open) return;
     const target = event.target; if (target.closest('input,select,textarea,[contenteditable=true]')) return;
     if (event.code === 'Space' && !revealed && (!target.closest('button,a') || target.closest('#reveal-card'))) { event.preventDefault(); reveal(); }
-    else if (revealed && /^[1-5]$/.test(event.key)) { event.preventDefault(); rateCard(RATINGS[Number(event.key) - 1].id); }
+    else if (revealed && /^[1-6]$/.test(event.key)) { event.preventDefault(); rateCard(STATUSES[Number(event.key) - 1].id); }
   });
 }
 async function init() {

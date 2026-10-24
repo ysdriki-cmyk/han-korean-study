@@ -6,9 +6,17 @@ export const RATINGS = Object.freeze([
   { id: 'again', symbol: '❌', label: '思い出せない' },
   { id: 'unsure', symbol: '△', label: 'あいまい' },
   { id: 'good', symbol: '○', label: 'できた' },
-  { id: 'solid', symbol: '◎', label: '自信あり' },
+  { id: 'solid', symbol: '◎', label: '完璧' },
 ].map(Object.freeze));
-export const UNSEEN = Object.freeze({ id: 'unseen', symbol: '—', label: '未演習' });
+export const UNSEEN = Object.freeze({ id: 'unseen', symbol: 'ー', label: '未回答' });
+
+/** Grade writing independently of the card's status in another mode or deck. */
+export function writingAssessment(previousRating, correct) {
+  if (correct === null) return UNSEEN.id;
+  if (correct === false) return 'again';
+  if (correct !== true) throw new TypeError('採点結果はtrue、false、nullで指定してください。');
+  return previousRating === 'good' || previousRating === 'solid' ? 'solid' : 'good';
+}
 
 const RATING_IDS = new Set([...RATINGS.map(item => item.id), UNSEEN.id]);
 const MODES = new Set(['read', 'write']);

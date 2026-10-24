@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getRecord, recordWriting } from '../dist/assets/learning.js';
-import { RATINGS, UNSEEN, ratingFor, recordAssessment, filterAssessments } from '../dist/assets/assessment.js';
+import { RATINGS, UNSEEN, writingAssessment, ratingFor, recordAssessment, filterAssessments } from '../dist/assets/assessment.js';
 
 const NOW = '2026-10-24T06:00:00.000Z';
 const PREVIOUS = '2026-10-22T06:00:00.000Z';
@@ -13,6 +13,8 @@ test('five symbol ratings and unseen state preserve legacy progress per mode', (
     ['hard', '❌❌❌'], ['again', '❌'], ['unsure', '△'], ['good', '○'], ['solid', '◎'],
   ]);
   assert.equal(UNSEEN.id, 'unseen');
+  assert.deepEqual(UNSEEN, { id: 'unseen', symbol: 'ー', label: '未回答' });
+  assert.equal(RATINGS.find(item => item.id === 'solid').label, '完璧');
   for (const [rank, read, write] of [
     ['required', 'unseen', 'unseen'], ['next', 'unseen', 'unseen'], ['later', 'unseen', 'unseen'],
     ['manji', 'again', 'unseen'], ['fair', 'unsure', 'unseen'], ['mastered', 'good', 'unseen'],
@@ -23,6 +25,55 @@ test('five symbol ratings and unseen state preserve legacy progress per mode', (
     assert.equal(ratingFor(source, {}, 'write'), write);
   }
   assert.equal(ratingFor(card, { [card.id]: { rank: 'manji', writing: { attempts: 1 } } }, 'write'), 'again');
+});
+
+test('correct writing becomes good, then solid only from a prior good or solid status', () => {
+  for (const previous of ['unseen', 'hard', 'again', 'unsure']) {
+    assert.equal(writingAssessment(previous, true), 'good');
+  }
+  assert.equal(writingAssessment('good', true), 'solid');
+  assert.equal(writingAssessment('solid', true), 'solid');
+  for (const previous of [...RATINGS.map(item => item.id), UNSEEN.id]) {
+    assert.equal(writingAssessment(previous, false), 'again');
+    assert.equal(writingAssessment(previous, null), 'unseen');
+  }
+  assert.throws(() => writingAssessment('good', 'true'), /採点/);
+});
+
+test('empty writing is saved as unanswered without increasing wrong or correct counts', () => {
+  const correct = recordAssessment(getRecord(card), 'write', 'good', { correct: true, now: PREVIOUS });
+  const blank = recordAssessment(correct, 'write', writingAssessment('good', null), { correct: null, now: NOW });
+  assert.equal(blank.assessments.write.rating, 'unseen');
+  assert.equal(blank.assessments.write.attempts, 2);
+  assert.equal(blank.assessments.write.correct, 1);
+  assert.equal(blank.assessments.write.wrong, 0);
+  assert.deepEqual(blank.assessments.write.history.at(-1), { rating: 'unseen', correct: null, at: NOW });
+  assert.equal(correct.assessments.write.rating, 'good');
+});
+
+test('writing promotion stays independent for both decks and both modes after saving', () => {
+  const kanji = { id: 'kanji:1', han: '가', state: 'next' };
+  const vocabulary = { id: 'vocabulary:1', han: '가', state: 'next' };
+  let records = {
+    [kanji.id]: recordAssessment(getRecord(kanji), 'read', 'solid', { now: PREVIOUS }),
+    [vocabulary.id]: recordAssessment(getRecord(vocabulary), 'read', 'again', { now: PREVIOUS }),
+  };
+  const answer = selected => {
+    const rating = writingAssessment(ratingFor(selected, records, 'write'), true);
+    records[selected.id] = recordAssessment(getRecord(selected, records), 'write', rating, { correct: true, now: NOW });
+    records = JSON.parse(JSON.stringify(records));
+  };
+  answer(kanji);
+  assert.equal(ratingFor(kanji, records, 'write'), 'good');
+  assert.equal(ratingFor(vocabulary, records, 'write'), 'unseen');
+  answer(kanji);
+  assert.equal(ratingFor(kanji, records, 'write'), 'solid');
+  answer(vocabulary);
+  assert.equal(ratingFor(vocabulary, records, 'write'), 'good');
+  assert.equal(ratingFor(kanji, records, 'read'), 'solid');
+  assert.equal(ratingFor(vocabulary, records, 'read'), 'again');
+  assert.equal(records[kanji.id].assessments.write.correct, 2);
+  assert.equal(records[vocabulary.id].assessments.write.correct, 1);
 });
 
 test('ratings and all dated events survive serialization and stay independent across modes', () => {
