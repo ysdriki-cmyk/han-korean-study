@@ -2,7 +2,7 @@ import { makeSession } from './core.js';
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples } from './topik.js';
-import { renderTopikUsage } from './topik-view.js';
+import { renderTopikUsage } from './topik-view.js?v=2';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, restorePracticePreferences } from './practice.js?v=10';
@@ -69,15 +69,17 @@ function updateCourseChrome() {
   $$('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.mode)));
   for (const item of DECKS) {
     const el = $(`#deck-${item.id}-count`);
-    if (el) el.textContent = deckData.has(item.id) ? deckData.get(item.id).cards.length.toLocaleString('ja-JP') : '—';
+    if (el) {
+      el.textContent = deckData.has(item.id) ? deckData.get(item.id).cards.length.toLocaleString('ja-JP') : '—';
+      el.hidden = item.id !== activeDeck;
+    }
   }
-  const shortTarget = activeDeck === 'kanji' ? '漢' : '訳';
-  $('#read-mode-label').textContent = `읽기（한→${shortTarget}）`;
-  $('#write-mode-label').textContent = `쓰기（${shortTarget}→한）`;
+  $('#read-mode-label').innerHTML = activeDeck === 'vocabulary' ? '읽기<span class="mode-direction">（단어→単語）</span>' : '읽기（한→漢）';
+  $('#write-mode-label').innerHTML = activeDeck === 'vocabulary' ? '쓰기<span class="mode-direction">（単語→단어）</span>' : '쓰기（漢→한）';
   $('#library-answer-label').textContent = target;
   const searchText = activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
   $('#library-search').placeholder = searchText; $('#library-search').setAttribute('aria-label', searchText);
-  document.title = `한と漢 — ${activeDeck === 'vocabulary' ? '単語' : '한ー漢'}`;
+  document.title = `한と漢 — ${activeDeck === 'vocabulary' ? '単語' : '한漢'}`;
 }
 function renderOverview() {
   const totals = counts(), mastered = totals.good + totals.solid;

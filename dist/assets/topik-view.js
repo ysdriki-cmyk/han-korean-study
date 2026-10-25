@@ -19,8 +19,8 @@ function highlight(value, query) {
   }
   return result;
 }
-function exampleTable(entries, query, extra = false) {
-  return `<div class="usage-table-wrap"><table class="usage-table"><caption class="sr-only">TOPIK1 ${extra ? '追加の' : ''}使用参考例</caption><colgroup><col><col><col></colgroup><thead><tr><th scope="col">韓国単語</th><th scope="col">英語</th><th scope="col">日本語</th></tr></thead><tbody>${entries.map(entry => `<tr><th scope="row" class="usage-word" lang="ko"><span>${highlight(entry.korean, query)}</span>${entry.exampleKo ? `<p class="usage-sentence"><small class="usage-sentence-label">例文</small>${highlight(entry.exampleKo, query)}</p>` : ''}</th><td lang="en">${esc(entry.english) || '<span class="usage-missing" aria-label="未記入">—</span>'}</td><td lang="ja"><span>${esc(entry.japanese) || '<span class="usage-missing" aria-label="未記入">—</span>'}</span>${entry.exampleJa ? `<p class="usage-sentence"><small class="usage-sentence-label">例文訳</small>${esc(entry.exampleJa)}</p>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+function exampleTable(entries, query) {
+  return `<div class="usage-table-wrap"><table class="usage-table"><caption class="sr-only">TOPIK1 使用参考例</caption><colgroup><col><col><col></colgroup><thead><tr><th scope="col">韓国単語</th><th scope="col">英語</th><th scope="col">日本語</th></tr></thead><tbody>${entries.map(entry => `<tr><th scope="row" class="usage-word" lang="ko"><span>${highlight(entry.korean, query)}</span>${entry.exampleKo ? `<p class="usage-sentence"><small class="usage-sentence-label">例文</small>${highlight(entry.exampleKo, query)}</p>` : ''}</th><td lang="en">${esc(entry.english) || '<span class="usage-missing" aria-label="未記入">—</span>'}</td><td lang="ja"><span>${esc(entry.japanese) || '<span class="usage-missing" aria-label="未記入">—</span>'}</span>${entry.exampleJa ? `<p class="usage-sentence"><small class="usage-sentence-label">例文訳</small>${esc(entry.exampleJa)}</p>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 export function renderTopikUsage(examples, query, state = 'ready') {
@@ -28,6 +28,5 @@ export function renderTopikUsage(examples, query, state = 'ready') {
   if (state === 'loading') return '<section class="usage-reference" role="status">使用参考例を読み込み中…</section>';
   const matches = findTopikExamples(examples, query);
   if (!matches.length) return '';
-  const shown = matches.slice(0, 4), remaining = matches.slice(4);
-  return `<section id="usage-reference" class="usage-reference" aria-labelledby="usage-reference-title"><div class="usage-heading"><h3 id="usage-reference-title">使用参考例</h3><span class="usage-source-tag">TOPIK1 · ${matches.length}件</span></div>${exampleTable(shown, query)}${remaining.length ? `<details class="usage-more"><summary>ほか${remaining.length}件を見る</summary>${exampleTable(remaining, query, true)}</details>` : ''}</section>`;
+  return `<section id="usage-reference" class="usage-reference" aria-labelledby="usage-reference-title"><div class="usage-heading"><h3 id="usage-reference-title">使用参考例</h3><span class="usage-source-tag">TOPIK1 · ${matches.length}件</span></div>${exampleTable(matches, query)}</section>`;
 }

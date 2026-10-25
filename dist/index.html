@@ -7,18 +7,24 @@
   <meta name="description" content="漢字と韓国語の対応テスト、韓国語の単語暗記。意味を答える・韓国語を書く、2つのモードで演習。">
   <title>한と漢 — 韓国語の演習</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./assets/practice.css">
+  <link rel="stylesheet" href="./assets/practice.css?v=3">
   <link rel="stylesheet" href="./assets/supporting.css">
   <link rel="stylesheet" href="./assets/ratings.css?v=4">
   <link rel="stylesheet" href="./assets/review.css?v=3">
-  <link rel="stylesheet" href="./assets/topik.css?v=1">
+  <link rel="stylesheet" href="./assets/topik.css?v=2">
   <script src="./assets/config.js" defer></script>
-  <script type="module" src="./assets/app.js?v=13"></script>
+  <script type="module" src="./assets/app.js?v=15"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">演習へ移動</a>
 <header class="app-header">
-  <a class="brand" href="#study" aria-label="한と漢 演習"><span class="brand-mark">한</span><strong>한と漢</strong></a>
+  <div class="header-identity">
+    <a class="brand" href="#study" aria-label="한と漢 演習"><span class="brand-mark">한</span><strong>한と漢</strong></a>
+    <div class="course-tabs" role="group" aria-label="教材">
+      <button type="button" data-deck="kanji" aria-pressed="true">한漢<span id="deck-kanji-count">650</span></button>
+      <button type="button" data-deck="vocabulary" aria-pressed="false">単語<span id="deck-vocabulary-count" hidden>4,559</span></button>
+    </div>
+  </div>
   <nav class="main-nav" aria-label="メインメニュー">
     <button class="nav-item active" data-view="study"><span data-icon="cards"></span>演習</button>
     <button class="nav-item" data-view="library"><span data-icon="grid"></span>一覧<span id="nav-count" class="nav-count"></span></button>
@@ -28,10 +34,6 @@
 </header>
 <main id="main" tabindex="-1">
   <div id="notice" class="notice" role="status" hidden></div>
-  <div class="course-tabs" role="group" aria-label="教材">
-    <button data-deck="kanji" aria-pressed="false">한ー漢<span id="deck-kanji-count">650</span></button>
-    <button data-deck="vocabulary" aria-pressed="true">単語<span id="deck-vocabulary-count">4,559</span></button>
-  </div>
     <div class="mode-toolbar">
       <div class="mode-switch" role="group" aria-label="演習モード">
         <button data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>

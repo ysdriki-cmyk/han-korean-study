@@ -19,7 +19,9 @@ test('all three columns, optional usage sentences and every hit remain available
   assert.ok(html.includes('韓国単語</th><th scope="col">英語</th><th scope="col">日本語'));
   assert.ok(html.includes('가세요'.replace('가','<mark class="usage-hit">가</mark>')));
   assert.ok(html.includes('行ってください'));
-  assert.ok(html.includes('ほか2件を見る'));
+  assert.ok(!html.includes('<details'));
+  assert.ok(!html.includes('ほか2件を見る'));
+  assert.equal((html.match(/<table /g)||[]).length,1);
   assert.equal((html.match(/scope="row"/g)||[]).length,6);
   assert.ok(html.includes('aria-label="未記入">—'));
   assert.equal(renderTopikUsage(rows,'없다'),'');
