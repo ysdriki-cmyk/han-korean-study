@@ -38,3 +38,5 @@
  .mode-copy strong { font-size: 12px; }
  .mode-switch button { padding: 10px 2px; }
 }
+
+.review-rule-note { margin: 10px 0 0; color: #667085; font-size: 12px; line-height: 1.8; }

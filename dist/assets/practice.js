@@ -1,7 +1,7 @@
 import { RANKS, getRecord } from './learning.js';
-import { RATINGS, filterAssessments, ratingFor } from './assessment.js';
+import { RATINGS, filterAssessments } from './assessment.js';
 import { essentialKanji } from './kanji.js';
-import { reviewDue } from './review.js';
+import { reviewDue } from './review.js?v=2';
 
 const FILTERS = new Set(['all', 'review', ...RANKS.map(rank => rank.id)]);
 const RATING_IDS = [...RATINGS.map(item => item.id), 'unseen'];
@@ -84,8 +84,7 @@ export function practicePool(cards, records = {}, settings = {}, now = Date.now(
     }
     return scoped.filter(card => {
       if (!included.has(card.id)) return false;
-      const rating = ratingFor(card, records, selectedMode);
-      return !SCHEDULED_RATINGS.includes(rating) || !hasDatedAssessment(getRecord(card, records), selectedMode) || reviewDue(card, records, selectedMode, now);
+      return !hasDatedAssessment(getRecord(card, records), selectedMode) || reviewDue(card, records, selectedMode, now);
     });
   }
   // Retain raw legacy rank-filter calls for integrations using the older API.

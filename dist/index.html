@@ -10,10 +10,10 @@
   <link rel="stylesheet" href="./assets/practice.css?v=3">
   <link rel="stylesheet" href="./assets/supporting.css">
   <link rel="stylesheet" href="./assets/ratings.css?v=4">
-  <link rel="stylesheet" href="./assets/review.css?v=3">
+  <link rel="stylesheet" href="./assets/review.css?v=4">
   <link rel="stylesheet" href="./assets/topik.css?v=2">
   <script src="./assets/config.js" defer></script>
-  <script type="module" src="./assets/app.js?v=15"></script>
+  <script type="module" src="./assets/app.js?v=16"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -77,11 +77,11 @@
     <div class="settings-content">
       <section class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
       <section id="settings-scope-section" class="settings-section"><h3>出題範囲</h3><div id="settings-scope" class="choice-row" role="group" aria-label="出題範囲"></div></section>
-      <section class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div></section>
+      <section class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div><p class="review-rule-note">❌❌❌・❌は、解答から2日後に出題します。</p></section>
       <section class="settings-section"><h3>何枚やる？</h3><div id="settings-limit" class="choice-row" role="group" aria-label="出題枚数"></div></section>
       <section class="settings-section"><h3>出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
       <details class="settings-advanced"><summary>詳細設定</summary>
-        <label class="check-label due-toggle"><input id="settings-due" type="checkbox" checked>復習日が来たカードも出す</label>
+        <label class="check-label due-toggle"><input id="settings-due" type="checkbox" checked>復習日が来た△・○・◎も出す</label>
         <h3>過去に間違えたカード</h3><div id="settings-mistakes" class="choice-row" role="group" aria-label="間違えた期間"></div>
         <h3>最近演習したカードを除く</h3><div id="settings-recent" class="choice-row" role="group" aria-label="最近の演習を除外"></div>
       </details>

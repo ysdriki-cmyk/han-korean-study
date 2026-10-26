@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getRecord } from '../dist/assets/learning.js';
 import { recordAssessment } from '../dist/assets/assessment.js';
-import { nextReviewFor, reviewDue, applyReviewSchedule, insertRetry } from '../dist/assets/review.js';
+import { nextReviewFor, reviewDue, applyReviewSchedule, mistakeCoolingDown } from '../dist/assets/review.js';
 
 const DAY = 86400000;
 const NOW = Date.parse('2026-10-25T06:00:00.000Z');
@@ -29,7 +29,7 @@ test('good and solid answers gain longer per-mode review intervals', () => {
 test('a miss or uncertainty resets the successful streak without erasing history', () => {
   let record = assess(assess(getRecord(card), 'read', 'good', NOW), 'read', 'good', NOW + DAY);
   record = assess(record, 'read', 'hard', NOW + 2 * DAY);
-  assert.equal(record.assessments.read.intervalDays, 0);
+  assert.equal(record.assessments.read.intervalDays, 2);
   record = assess(record, 'read', 'good', NOW + 3 * DAY);
   assert.equal(record.assessments.read.intervalDays, 1);
   record = assess(record, 'read', 'unsure', NOW + 4 * DAY);
@@ -49,7 +49,7 @@ test('post-grading confidence revises spacing without another attempt or a false
   assert.equal(revised.assessments.write.correct, 1);
   const wrong = assess(getRecord(card), 'write', 'again', NOW, false);
   const confidentWrong = applyReviewSchedule(recordAssessment(wrong, 'write', 'solid', { now: NOW, countAttempt: false }), 'write', 'solid', NOW);
-  assert.equal(confidentWrong.assessments.write.intervalDays, 0);
+  assert.equal(confidentWrong.assessments.write.intervalDays, 2);
   assert.equal(confidentWrong.assessments.write.wrong, 1);
   assert.equal(confidentWrong.assessments.write.history[0].correct, false);
 });
@@ -76,30 +76,39 @@ test('existing dated history gains a schedule but undated legacy ranks do not ga
   assert.throws(() => nextReviewFor(dated, 'invalid', NOW), /モード/);
 });
 
-test('hard and again retries appear after three and five other cards without mutating the base set', () => {
-  const queue = Array.from({ length: 10 }, (_, i) => ({ id: `kanji:${i + 1}` }));
-  const hard = insertRetry(queue, 0, queue[0], 'hard');
-  const again = insertRetry(queue, 0, queue[0], 'again');
-  assert.equal(hard.at, 4);
-  assert.equal(again.at, 6);
-  assert.equal(hard.queue[4].id, queue[0].id);
-  assert.equal(again.queue[6].id, queue[0].id);
-  assert.equal(queue.length, 10);
-  assert.equal(hard.queue.length, 11);
-  assert.equal(insertRetry(queue, 0, queue[0], 'good').inserted, false);
+test('mistakes wait exactly 48 hours independently in each deck and mode', () => {
+  for (const deckId of ['kanji', 'vocabulary']) {
+    const target = {id:`${deckId}:1`,han:'가'};
+    const other = {id:`${deckId === 'kanji' ? 'vocabulary' : 'kanji'}:1`,han:'가'};
+    for (const mode of ['read', 'write']) {
+      for (const rating of ['hard', 'again']) {
+        const record = assess(getRecord(target), mode, rating, NOW, mode === 'write' ? false : null);
+        const saved = JSON.parse(JSON.stringify({[target.id]:record}));
+        assert.equal(record.assessments[mode].intervalDays, 2);
+        assert.equal(reviewDue(target, saved, mode, NOW + 2 * DAY - 1), false);
+        assert.equal(reviewDue(target, saved, mode, NOW + 2 * DAY), true);
+        assert.equal(mistakeCoolingDown(target, saved, mode, NOW + 2 * DAY - 1), true);
+        assert.equal(mistakeCoolingDown(target, saved, mode, NOW + 2 * DAY), false);
+        assert.equal(mistakeCoolingDown(target, saved, mode === 'read' ? 'write' : 'read', NOW), false);
+        assert.equal(mistakeCoolingDown(other, saved, mode, NOW), false);
+      }
+    }
+  }
 });
 
-test('short-set retries use the remaining cards, avoid duplicates, and stop after two extra attempts', () => {
-  const queue = [{ id: 'kanji:1' }, { id: 'kanji:2' }];
-  const first = insertRetry(queue, 0, queue[0], 'again');
-  assert.equal(first.at, 2);
-  assert.equal(insertRetry(first.queue, 0, queue[0], 'hard').inserted, false);
-  const second = insertRetry(first.queue, 2, queue[0], 'hard');
-  assert.equal(second.at, 3);
-  assert.equal(second.queue.length, 4);
-  const third = insertRetry(second.queue, 3, queue[0], 'again');
-  assert.equal(third.inserted, false);
-  assert.equal(third.queue.filter(item => item.id === 'kanji:1').length, 3);
-  assert.equal(insertRetry(queue, 0, queue[0], 'again', { maxRepeats: 0 }).inserted, false);
-  assert.throws(() => insertRetry(queue, -1, queue[0], 'again'), /位置/);
+test('saved zero-day mistakes gain a two-day minimum without rewriting history or resetting the clock', () => {
+  const old = recordAssessment(getRecord(card), 'write', 'again', {correct:false, now:NOW});
+  old.assessments.write.dueAt = new Date(NOW).toISOString();
+  old.assessments.write.intervalDays = 0;
+  const before = JSON.stringify(old);
+  assert.deepEqual(nextReviewFor(old, 'write', NOW + DAY), {dueAt:new Date(NOW + 2 * DAY).toISOString(),intervalDays:2});
+  assert.equal(JSON.stringify(old), before);
+  assert.equal(reviewDue(card, {[card.id]:old}, 'write', NOW + 2 * DAY), true);
+
+  const corrected = assess(old, 'write', 'good', NOW + 60000, true);
+  assert.equal(Date.parse(corrected.assessments.write.dueAt), NOW + 2 * DAY);
+  const unscored = applyReviewSchedule(recordAssessment(old, 'write', 'unseen', {countAttempt:false,now:NOW}), 'write', 'unseen', NOW);
+  assert.equal(Date.parse(unscored.assessments.write.dueAt), NOW + 2 * DAY);
+  const legacy = {...getRecord(card),rank:'manji'};
+  assert.equal(mistakeCoolingDown(card, {[card.id]:legacy}, 'write', NOW), false);
 });

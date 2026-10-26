@@ -130,5 +130,6 @@ test('due supplements still obey recent-practice exclusion and dated-mistake fil
   assert.equal(practicePool([card], saved, { ...defaults, excludeRecentDays:3 }, afterDays(1)).length, 0);
   assert.equal(practicePool([card], saved, { ...defaults, recentMistakesDays:7 }, afterDays(1)).length, 0);
   const wrong = assessed(card, 'solid', {correct:false});
-  assert.equal(practicePool([card], {[card.id]:wrong}, { ...defaults, recentMistakesDays:7 }, afterDays(1)).length, 1);
+  assert.equal(practicePool([card], {[card.id]:wrong}, { ...defaults, recentMistakesDays:7 }, afterDays(1)).length, 0);
+  assert.equal(practicePool([card], {[card.id]:wrong}, { ...defaults, recentMistakesDays:7 }, afterDays(2)).length, 1);
 });

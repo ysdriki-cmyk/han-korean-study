@@ -5,9 +5,9 @@ import { parseTopikExamples } from './topik.js';
 import { renderTopikUsage } from './topik-view.js?v=2';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
-import { practiceSettings, practicePool, restorePracticePreferences } from './practice.js?v=10';
+import { practiceSettings, practicePool, restorePracticePreferences } from './practice.js?v=11';
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
-import { applyReviewSchedule, insertRetry, nextReviewFor } from './review.js';
+import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review.js?v=2';
 import { icon } from './icons.js?v=2';
 
 const $ = selector => document.querySelector(selector);
@@ -133,7 +133,8 @@ function renderSettings() {
 function startSession(custom = null, { continuing = false, all = false } = {}) {
   composing = false; compositionEndedAt = 0;
   if (!continuing) cycleSeen = new Set();
-  session = makeSession(custom ?? pool(), { limit: all ? 'all' : settings.limit, shuffle: settings.shuffle });
+  const eligible = (custom ?? pool()).filter(card => !mistakeCoolingDown(card, records, settings.mode));
+  session = makeSession(eligible, { limit: all ? 'all' : settings.limit, shuffle: settings.shuffle });
   initialCount = session.length; sessionScope = settings.scope;
   hintSeeds = new Map(session.map(card => [card.id, Math.floor(Math.random() * Math.max(1, kanjiPromptChoices(card).length))]));
   position = 0; revealed = false; writeResult = null; submitted = ''; answers = new Map(); cardViews = new Map(); advancedPositions = new Set();
@@ -163,11 +164,6 @@ function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);
   const repeats = session.slice(0, position).filter(item => item.id === card.id).length;
   return hints.length ? hints[((hintSeeds.get(card.id) || 0) + repeats) % hints.length] : '';
-}
-function failedCards() {
-  const latest = new Map();
-  for (const result of answers.values()) latest.set(result.cardId, result);
-  return [...new Map(session.filter(card => { const result = latest.get(card.id); return result && (result.correct === false || ['hard', 'again'].includes(result.rating)); }).map(card => [card.id, card])).values()];
 }
 function reviewNote(card) {
   const review = nextReviewFor(record(card), settings.mode);
@@ -230,12 +226,11 @@ function renderCard() {
   actions += cardNavigation();
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}"></form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = writing && revealed ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${session.slice(0, position).some(item => item.id === card.id) ? ' · 復習' : ''}</span></div>${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${writing ? reviewNote(card) : ''}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState) : ''}`;
+  el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${session.slice(0, position).some(item => item.id === card.id) ? ' · 復習' : ''}</span></div>${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${reviewNote(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
-  const retry = failedCards();
-  el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${initialCount}枚${session.length > initialCount ? `＋復習${session.length - initialCount}回` : ''} / ${session.length}回中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions"><button class="button secondary previous-button" data-action="previous">${icon('arrow')}前へ</button>${retry.length ? `<button class="button secondary" data-action="retry">間違えた${retry.length}枚を再演習</button>` : ''}<button class="button primary" data-action="next-set">次のセット</button></div></div>`;
+  el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${initialCount}枚${session.length > initialCount ? `＋復習${session.length - initialCount}回` : ''} / ${session.length}回中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions"><button class="button secondary previous-button" data-action="previous">${icon('arrow')}前へ</button><button class="button primary" data-action="next-set">次のセット</button></div></div>`;
 }
 function reveal() {
   if (!session[position] || revealed || settings.mode !== 'read') return;
@@ -262,13 +257,7 @@ function checkWriting() {
 function advance() {
   if (!session[position] || !answers.has(position)) return;
   saveCardView();
-  const card = session[position], result = answers.get(position);
-  // Reviewing a completed position never creates an extra retry or assessment.
-  if (!advancedPositions.has(position)) {
-    const retryRating = settings.mode === 'write' && result.correct === false && !['hard', 'again'].includes(result.rating) ? 'again' : result.rating;
-    session = insertRetry(session, position, card, retryRating).queue;
-    advancedPositions.add(position);
-  }
+  advancedPositions.add(position);
   position += 1; restoreCardView();
   renderOverview(); renderCard(); focusCard();
 }
@@ -316,8 +305,10 @@ function updateSelection() {
 }
 function practiceSelected(ids) {
   const selectedCards = cards.filter(card => ids.has(card.id)); if (!selectedCards.length) return;
-  // Selecting a set is a navigation action. It never changes any learning rank.
-  selected.clear(); startSession(selectedCards, { all: true }); setView('study'); renderLibrary();
+  const eligible = selectedCards.filter(card => !mistakeCoolingDown(card, records, settings.mode));
+  if (!eligible.length) { toast('間違えたカードは、解答から2日後に演習できます。'); return; }
+  if (eligible.length < selectedCards.length) toast('間違えてから2日未満のカードは除外しました。');
+  selected.clear(); startSession(eligible, { all: true }); setView('study'); renderLibrary();
 }
 function filteredLibrary(id) { rankFilter = id; page = 0; selected.clear(); renderOverview(); setView('library'); }
 function courseConfig(id) {
@@ -385,7 +376,6 @@ function handleCardAction(action) {
   else if (action === 'reload') location.reload();
   else if (action === 'reload-examples') retryTopikExamples();
   else if (action === 'settings') openSettings();
-  else if (action === 'retry') startSession(failedCards(), { all: true });
   else if (action === 'next-set') {
     session.forEach(card => cycleSeen.add(card.id));
     let remaining = pool().filter(card => !cycleSeen.has(card.id));
