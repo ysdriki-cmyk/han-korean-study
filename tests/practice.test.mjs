@@ -41,8 +41,8 @@ test('new mode preferences override old stage/direction and old choices migrate 
   assert.equal(resolvePracticeMode({}), 'write');
   assert.equal(resolvePracticeMode(null), 'write');
   assert.equal(practiceSettings(null).filter, 'all');
-  assert.deepEqual(practiceSettings({}), { mode: 'write', filter: 'all', limit: '30', shuffle: true, libraryDirection: 'ko-han', ratings: ['hard', 'again', 'unseen'], recentMistakesDays: 0, excludeRecentDays: 0, scope: 'essential', includeDue: true });
-  assert.deepEqual(practiceSettings({ mode: 'write', filter: 'required', limit: 50, shuffle: true }), { mode: 'write', filter: 'required', limit: '50', shuffle: true, libraryDirection: 'ko-han', ratings: ['unseen'], recentMistakesDays: 0, excludeRecentDays: 0, scope: 'essential', includeDue: true });
+  assert.deepEqual(practiceSettings({}), { mode: 'write', sessionType: 'practice', reviewDays: 7, filter: 'all', limit: '30', shuffle: true, libraryDirection: 'ko-han', ratings: ['hard', 'again', 'unseen'], recentMistakesDays: 0, excludeRecentDays: 0, scope: 'essential', includeDue: true });
+  assert.deepEqual(practiceSettings({ mode: 'write', filter: 'required', limit: 50, shuffle: true }), { mode: 'write', sessionType: 'practice', reviewDays: 7, filter: 'required', limit: '50', shuffle: true, libraryDirection: 'ko-han', ratings: ['unseen'], recentMistakesDays: 0, excludeRecentDays: 0, scope: 'essential', includeDue: true });
 });
 
 test('selecting cards for practice can preserve their shared ranks and direction histories', () => {

@@ -1,4 +1,5 @@
 import { RANKS, getRecord } from './learning.js';
+import { makeSession } from './core.js';
 import { RATINGS, filterAssessments } from './assessment.js';
 import { essentialKanji } from './kanji.js';
 import { reviewDue } from './review.js?v=2';
@@ -9,6 +10,48 @@ const DEFAULT_RATINGS = ['hard', 'again', 'unseen'];
 const SCHEDULED_RATINGS = ['unsure', 'good', 'solid'];
 const oldRatings = filter => ({ all: RATING_IDS, review: ['hard', 'again', 'unsure'], manji: ['hard', 'again'], fair: ['unsure'], mastered: ['good'], read: ['good'], read2: ['solid'], required: ['unseen'], next: ['unseen'], later: ['unseen'] })[filter] || DEFAULT_RATINGS;
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+const count = value => Number.isFinite(Number(value)) && Number(value) >= 0 ? Math.floor(Number(value)) : 0;
+const timestamp = value => {
+  const parsed = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/** Count actual recorded encounters, independently for each deck and direction. */
+export function practiceCount(card, records = {}, mode = 'read') {
+  const record = getRecord(card, records), selected = mode === 'write' ? 'write' : 'read';
+  const assessment = object(object(record.assessments)[selected]);
+  const history = Array.isArray(assessment.history) ? assessment.history : [];
+  const recall = object(record.attempts[selected === 'write' ? 'han-ko' : 'ko-han']);
+  return Math.max(count(assessment.attempts), history.length) + count(recall.right) + count(recall.wrong) + count(record[selected === 'write' ? 'writing' : 'reading'].attempts);
+}
+
+/** Source ranks and future due dates never invent a recent practice event. */
+export function lastPracticeAt(card, records = {}, mode = 'read') {
+  const record = getRecord(card, records), selected = mode === 'write' ? 'write' : 'read';
+  const assessment = object(object(record.assessments)[selected]);
+  const history = Array.isArray(assessment.history) ? assessment.history : [];
+  const values = [assessment.lastAt, ...history.map(event => object(event).at), record.attempts[selected === 'write' ? 'han-ko' : 'ko-han'].lastAt, record[selected === 'write' ? 'writing' : 'reading'].passedAt];
+  const times = values.map(timestamp).filter(value => value !== null);
+  return times.length ? Math.max(...times) : null;
+}
+
+/** Select low-count cards before applying the limit; randomize only equal counts. */
+export function makePracticeSession(cards, records = {}, settings = {}, { random = Math.random } = {}) {
+  const limit = settings.limit ?? '30';
+  const size = limit === 'all' || limit === Infinity ? Infinity : Number(limit);
+  if (size !== Infinity && (!Number.isInteger(size) || size < 0)) throw new RangeError('学習枚数は0以上の整数またはallを指定してください。');
+  const groups = new Map(), result = [];
+  for (const card of cards) {
+    const attempts = practiceCount(card, records, settings.mode);
+    if (!groups.has(attempts)) groups.set(attempts, []);
+    groups.get(attempts).push(card);
+  }
+  for (const attempts of [...groups.keys()].sort((a, b) => a - b)) {
+    if (result.length >= size) break;
+    result.push(...makeSession(groups.get(attempts), { limit: size === Infinity ? 'all' : size - result.length, shuffle: settings.shuffle !== false, random }));
+  }
+  return result;
+}
 
 /** An explicit previous choice is retained; new learners begin with writing. */
 export function resolvePracticeMode(preference = {}) {
@@ -24,6 +67,8 @@ export function practiceSettings(preference = {}) {
   const source = object(preference);
   return {
     mode: resolvePracticeMode(source),
+    sessionType: source.sessionType === 'review' ? 'review' : 'practice',
+    reviewDays: source.reviewDays !== null && source.reviewDays !== '' && [0, 1, 7, 30].includes(Number(source.reviewDays)) ? Number(source.reviewDays) : 7,
     filter: FILTERS.has(source.filter) ? source.filter : 'all',
     limit: ['10', '20', '30', '50', 'all'].includes(String(source.limit)) ? String(source.limit) : '30',
     shuffle: source.shuffle !== false,
@@ -71,6 +116,14 @@ export function practicePool(cards, records = {}, settings = {}, now = Date.now(
   const source = object(settings);
   const { filter = 'all', mode = 'read' } = source;
   const scoped = source.scope === 'all' ? [...cards] : cards.filter(card => (card.deckId !== 'kanji' && source.deckId !== 'kanji') || essentialKanji(card));
+  if (source.sessionType === 'review') {
+    const current = timestamp(now) ?? Date.now();
+    const days = practiceSettings(source).reviewDays;
+    return scoped.filter(card => {
+      const at = lastPracticeAt(card, records, mode);
+      return at !== null && at <= current && (days === 0 || at >= current - days * 86400000);
+    });
+  }
   if (Array.isArray(source.ratings)) {
     if (!source.ratings.length) return [];
     const selectedMode = mode === 'write' ? 'write' : 'read';

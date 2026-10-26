@@ -1,0 +1,30 @@
+.guide-header { max-width: 960px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 26px 28px; }
+.guide-header .brand > strong { font-size: 22px; }
+.guide-content { max-width: 900px; padding: 32px 48px 50px; margin: 0 auto 40px; border: 1px solid #dfe5ed; border-radius: 16px; background: white; font-size: 15px; line-height: 1.95; }
+.guide-content h1 { margin: 0 0 12px; font-size: 30px; line-height: 1.5; }
+.guide-lead { color: #667085; margin: 0; }
+.guide-index { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 24px 0 36px; padding-bottom: 22px; border-bottom: 1px solid #e5eaf1; }
+.guide-index a { color: #286fcf; font-size: 14px; text-decoration: none; }
+.guide-index a:hover { text-decoration: underline; }
+.guide-content section { scroll-margin-top: 24px; }
+.guide-content section + section { margin-top: 40px; }
+.guide-content h2 { margin: 28px 0 14px; font-size: 21px; line-height: 1.6; }
+.guide-content p { margin: 12px 0; }
+.guide-content ol { padding-left: 24px; }
+.guide-content li { padding-left: 4px; margin: 8px 0; }
+.guide-example { margin: 22px 0; padding: 18px 22px; border-radius: 10px; background: #f0f6ff; color: #365d92; }
+.guide-example p { margin-bottom: 0; }
+.guide-table-wrap { overflow: auto; border: 1px solid #dfe5ed; border-radius: 10px; }
+.guide-content table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
+.guide-content th, .guide-content td { padding: 13px 16px; vertical-align: top; }
+.guide-content th { background: #f6f9fd; color: #526075; font-weight: 600; }
+.guide-content td { border-top: 1px solid #e5eaf1; }
+@media (max-width: 600px) {
+ .guide-header { padding: 18px 16px; }
+ .guide-header .brand > strong { font-size: 19px; }
+ .guide-content { padding: 24px 20px 32px; margin: 0 12px 24px; font-size: 14px; }
+ .guide-content h1 { font-size: 24px; }
+ .guide-content h2 { font-size: 19px; }
+ .guide-content th, .guide-content td { padding: 11px 10px; font-size: 13px; }
+ .guide-example { padding: 15px 16px; }
+}

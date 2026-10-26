@@ -10,10 +10,10 @@
   <link rel="stylesheet" href="./assets/practice.css?v=3">
   <link rel="stylesheet" href="./assets/supporting.css">
   <link rel="stylesheet" href="./assets/ratings.css?v=4">
-  <link rel="stylesheet" href="./assets/review.css?v=4">
+  <link rel="stylesheet" href="./assets/review.css?v=5">
   <link rel="stylesheet" href="./assets/topik.css?v=2">
   <script src="./assets/config.js" defer></script>
-  <script type="module" src="./assets/app.js?v=16"></script>
+  <script type="module" src="./assets/app.js?v=17"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -39,7 +39,13 @@
         <button data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>
         <button data-mode="read" aria-pressed="false"><span data-icon="book"></span><span class="mode-copy"><strong id="read-mode-label">읽기（한→漢）</strong></span></button>
       </div>
-      <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="出題設定" title="出題設定"><span data-icon="sliders"></span><span>出題設定</span></button>
+      <div class="practice-tools">
+        <div class="practice-type-switch" role="group" aria-label="通常演習と復習の切り替え">
+          <button type="button" data-practice-type="practice" aria-pressed="true">通常演習</button>
+          <button type="button" data-practice-type="review" aria-pressed="false">復習</button>
+        </div>
+        <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="出題設定" title="出題設定"><span data-icon="sliders"></span><span>出題設定</span></button>
+      </div>
     </div>
   <section id="study-view" class="view">
     <h1 class="sr-only">演習</h1>
@@ -72,15 +78,16 @@
   </section>
 </main>
 <dialog id="practice-settings" aria-labelledby="settings-title">
-  <div class="dialog-heading"><h2 id="settings-title">今日は、どれから？</h2><button id="close-settings" class="icon-button" aria-label="閉じる">×</button></div>
+  <div class="dialog-heading"><h2 id="settings-title">出題設定</h2><a class="rules-link" href="./guide.html" target="_blank" rel="noopener">出題ルール</a><button id="close-settings" class="icon-button" aria-label="閉じる">×</button></div>
   <form id="settings-form">
     <div class="settings-content">
-      <section class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
+      <section id="settings-normal-presets" class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
       <section id="settings-scope-section" class="settings-section"><h3>出題範囲</h3><div id="settings-scope" class="choice-row" role="group" aria-label="出題範囲"></div></section>
-      <section class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div><p class="review-rule-note">❌❌❌・❌は、解答から2日後に出題します。</p></section>
+      <section id="settings-normal-ratings" class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div><p class="review-rule-note">未演習 → 演習回数の少ない順。❌❌❌・❌は2日後から。</p></section>
+      <section id="settings-review-period" class="settings-section" hidden><h3>復習する履歴</h3><div id="settings-review-days" class="choice-row" role="group" aria-label="復習する履歴の期間"></div><p class="review-rule-note">待ち時間中のカードも、すぐに復習できます。</p></section>
       <section class="settings-section"><h3>何枚やる？</h3><div id="settings-limit" class="choice-row" role="group" aria-label="出題枚数"></div></section>
-      <section class="settings-section"><h3>出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
-      <details class="settings-advanced"><summary>詳細設定</summary>
+      <section class="settings-section"><h3>同じ演習回数の出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
+      <details id="settings-advanced" class="settings-advanced"><summary>詳細設定</summary>
         <label class="check-label due-toggle"><input id="settings-due" type="checkbox" checked>復習日が来た△・○・◎も出す</label>
         <h3>過去に間違えたカード</h3><div id="settings-mistakes" class="choice-row" role="group" aria-label="間違えた期間"></div>
         <h3>最近演習したカードを除く</h3><div id="settings-recent" class="choice-row" role="group" aria-label="最近の演習を除外"></div>
