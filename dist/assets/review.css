@@ -39,7 +39,6 @@
  .mode-switch button { padding: 10px 2px; }
 }
 
-.review-rule-note { margin: 10px 0 0; color: #667085; font-size: 12px; line-height: 1.8; }
 
 .practice-tools { display: flex; align-items: center; gap: 14px; margin-left: auto; }
 .practice-tools .settings-button { margin-left: 0; }
@@ -47,8 +46,6 @@
 .practice-type-switch button { min-height: 36px; padding: 7px 14px; border: 1px solid transparent; border-radius: 7px; color: #667085; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .practice-type-switch button:hover { background: #f8fbff; }
 .practice-type-switch button[aria-pressed=true] { background: white; border-color: #c5d8f4; color: #236ed8; box-shadow: 0 1px 4px #23354d0b; }
-.rules-link { margin-left: auto; color: #3776c8; font-size: 12px; text-decoration: none; white-space: nowrap; }
-.rules-link:hover { text-decoration: underline; }
 #practice-settings .dialog-heading { gap: 14px; }
 @media(max-width:960px) {
  .mode-toolbar { flex-wrap: wrap; }

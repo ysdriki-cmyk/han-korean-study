@@ -1,4 +1,6 @@
 const icons = {
+  volume: '<path d="m11 4-6 5H2v6h3l6 5V4Zm4 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
   book: '<path d="M12 5c-3-2-6-2-10-1v15c4-1 7-1 10 1 3-2 6-2 10-1V4c-4-1-7-1-10 1Zm0 0v15"/>',
   pen: '<path d="m15 5 4 4M4 20l5-1L21 7a2.8 2.8 0 0 0-4-4L5 15l-1 5ZM4 20h16"/>',
   chart: '<path d="M4 3v18h17M9 15v-4m5 4V6m5 9V9"/>',

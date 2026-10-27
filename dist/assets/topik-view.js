@@ -1,3 +1,4 @@
+import { speechButton } from './speech-view.js';
 import { findTopikExamples } from './topik.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
@@ -20,7 +21,7 @@ function highlight(value, query) {
   return result;
 }
 function exampleTable(entries, query) {
-  return `<div class="usage-table-wrap"><table class="usage-table"><caption class="sr-only">TOPIK1 使用参考例</caption><colgroup><col><col><col></colgroup><thead><tr><th scope="col">韓国単語</th><th scope="col">英語</th><th scope="col">日本語</th></tr></thead><tbody>${entries.map(entry => `<tr><th scope="row" class="usage-word" lang="ko"><span>${highlight(entry.korean, query)}</span>${entry.exampleKo ? `<p class="usage-sentence"><small class="usage-sentence-label">例文</small>${highlight(entry.exampleKo, query)}</p>` : ''}</th><td lang="en">${esc(entry.english) || '<span class="usage-missing" aria-label="未記入">—</span>'}</td><td lang="ja"><span>${esc(entry.japanese) || '<span class="usage-missing" aria-label="未記入">—</span>'}</span>${entry.exampleJa ? `<p class="usage-sentence"><small class="usage-sentence-label">例文訳</small>${esc(entry.exampleJa)}</p>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="usage-table-wrap"><table class="usage-table"><caption class="sr-only">TOPIK1 使用参考例</caption><colgroup><col><col><col></colgroup><thead><tr><th scope="col">韓国単語</th><th scope="col">英語</th><th scope="col">日本語</th></tr></thead><tbody>${entries.map(entry => `<tr><th scope="row" class="usage-word" lang="ko"><span>${highlight(entry.korean, query)}</span>${speechButton(entry.korean)}${entry.exampleKo ? `<p class="usage-sentence"><small class="usage-sentence-label">例文</small>${highlight(entry.exampleKo, query)}${speechButton(entry.exampleKo)}</p>` : ''}</th><td lang="en">${esc(entry.english) || '<span class="usage-missing" aria-label="未記入">—</span>'}</td><td lang="ja"><span>${esc(entry.japanese) || '<span class="usage-missing" aria-label="未記入">—</span>'}</span>${entry.exampleJa ? `<p class="usage-sentence"><small class="usage-sentence-label">例文訳</small>${esc(entry.exampleJa)}</p>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 export function renderTopikUsage(examples, query, state = 'ready') {

@@ -1,13 +1,15 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples } from './topik.js';
-import { renderTopikUsage } from './topik-view.js?v=2';
+import { renderTopikUsage } from './topik-view.js?v=3';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=12';
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
 import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review.js?v=2';
-import { icon } from './icons.js?v=2';
+import { icon } from './icons.js?v=3';
+import { createKoreanSpeaker } from './speech.js';
+import { speechButton } from './speech-view.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -27,6 +29,21 @@ let cardViews = new Map(), advancedPositions = new Set();
 let answers = new Map(), hintSeeds = new Map(), initialCount = 0, sessionScope = 'essential';
 let rankFilter = 'all', page = 0, selected = new Set(), revealedRows = new Set(), pageCards = [];
 let loaded = false, storageAvailable = true, polling = false, composing = false, compositionEndedAt = 0, toastTimer;
+
+const speaker = createKoreanSpeaker({
+  synthesis: window.speechSynthesis,
+  Utterance: window.SpeechSynthesisUtterance,
+  onState: ({text, phase}) => {
+    $$('[data-speak]').forEach(button => {
+      const active = button.dataset.speak === text && phase !== 'idle';
+      button.setAttribute('aria-pressed', String(active));
+      button.setAttribute('aria-busy', String(active && phase === 'loading'));
+      button.dataset.speechPhase = active ? phase : 'idle';
+      button.title = active ? '停止' : '読み上げ';
+    });
+  },
+  onError: code => toast(code === 'unsupported' ? 'このブラウザでは読み上げを利用できません。' : code === 'no-korean-voice' ? '韓国語の音声が見つかりません。端末の音声設定を確認してください。' : '読み上げできませんでした。もう一度お試しください。', true),
+});
 
 function readJSON(key, fallback) {
   try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
@@ -161,13 +178,13 @@ function switchPracticeType(type) {
 }
 function answerRows(card) {
   const main = settings.mode === 'write'
-    ? `<div class="answer-row"><span class="answer-label">韓国語</span><p class="answer-value hangul" lang="ko">${esc(card.han)}</p></div>`
+    ? `<div class="answer-row"><span class="answer-label">韓国語</span><p class="answer-value hangul" lang="ko">${esc(card.han)}${speechButton(card.han)}</p></div>`
     : answerFields(card, activeDeck).map(field => `<div class="answer-row"><span class="answer-label">${esc(field.label)}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('');
   const examples = activeDeck === 'vocabulary' && (card.exampleKo || card.exampleJp)
-    ? `<details class="example-block"><summary>例文</summary>${card.exampleKo ? `<p lang="ko">${esc(card.exampleKo)}</p>` : ''}${card.exampleJp ? `<p lang="ja">${esc(card.exampleJp)}</p>` : ''}</details>` : '';
+    ? `<details class="example-block"><summary>例文</summary>${card.exampleKo ? `<p lang="ko">${esc(card.exampleKo)}${speechButton(card.exampleKo)}</p>` : ''}${card.exampleJp ? `<p lang="ja">${esc(card.exampleJp)}</p>` : ''}</details>` : '';
   const otherHints = activeDeck === 'kanji' && settings.mode === 'write' ? answerFields(card, activeDeck).map(field => `<div class="answer-row"><span class="answer-label">${esc(field.label)}</span><p class="answer-value" lang="ja">${esc(field.text)}</p></div>`).join('') : '';
   const alternatives = activeDeck === 'kanji' && settings.mode === 'write' ? kanjiAnswersForPrompt(cards, currentKanjiHint(card)).filter(answer => answer !== card.han) : [];
-  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${esc(alternatives.join('・'))}</p></div>` : '') + otherHints + examples;
+  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + examples;
 }
 function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);
@@ -180,7 +197,7 @@ function reviewNote(card) {
   return days > 0 ? `<p class="review-note">次の復習：${days}日後</p>` : '';
 }
 function questionMarkup(card) {
-  if (settings.mode === 'read') return `<p class="question-word${card.han.length > 4 ? ' long' : ''}" lang="ko">${esc(card.han)}</p>`;
+  if (settings.mode === 'read') return `<div class="question-with-speech"><p class="question-word${card.han.length > 4 ? ' long' : ''}" lang="ko">${esc(card.han)}</p>${speechButton(card.han)}</div>`;
   if (activeDeck === 'vocabulary') {
     const japanese = card.kanji, english = card.english || card.meaning;
     return `<p class="question-word reverse" lang="${japanese ? 'ja' : 'en'}">${esc(japanese || english)}</p>${japanese && english ? `<p class="question-english" lang="en">${esc(english)}</p>` : ''}`;
@@ -217,6 +234,7 @@ function assessmentHistory(card) {
   }).join('')}</div></details>`;
 }
 function renderCard() {
+  speaker.stop();
   const el = $('#flashcard'); el.setAttribute('aria-busy', String(!loaded)); el.dataset.mode = settings.mode; el.classList.toggle('revealed', revealed);
   if (!loaded) return;
   if (!cards.length) { el.innerHTML = '<div class="empty-state"><h2>データを読み込めませんでした</h2><button class="button primary" data-action="reload">再読み込み</button></div>'; return; }
@@ -276,6 +294,7 @@ function previous() {
   renderOverview(); renderCard(); focusCard();
 }
 function setView(next, { hash = true } = {}) {
+  speaker.stop();
   view = ['study', 'library', 'progress'].includes(next) ? next : 'study';
   $$('.view').forEach(el => { el.hidden = el.id !== `${view}-view`; });
   $$('.main-nav [data-view]').forEach(button => {
@@ -286,6 +305,7 @@ function setView(next, { hash = true } = {}) {
   if (view === 'library') renderLibrary(); else if (view === 'study') renderCard();
 }
 function renderLibrary() {
+  if (view === 'library') speaker.stop();
   const query = $('#library-search').value.normalize('NFC').trim().toLowerCase();
   const matching = cards.filter(card => (rankFilter === 'all' || rank(card) === rankFilter)
     && (!query || [card.id, card.han, card.kanji, card.hanja, card.meaning, card.tags, card.notes].some(text => String(text || '').normalize('NFC').toLowerCase().includes(query))));
@@ -299,7 +319,7 @@ function renderLibrary() {
     const revealButton = `<button class="masked-answer" data-reveal-row="${id}">表示</button>`;
     const fields = answerFields(card, activeDeck);
     const text = fields.map((field, index) => index ? `<small lang="${field.lang}">${esc(field.text)}</small>` : `<span lang="${field.lang}">${esc(field.text)}</span>`).join('');
-    return `<tr><td><input type="checkbox" data-select-card="${id}" aria-label="${accessibleName}を選ぶ"${selected.has(card.id) ? ' checked' : ''}></td><td class="han-cell">${hideHan ? revealButton : `<span lang="ko">${esc(card.han)}</span>`}</td><td class="meaning-cell">${hideMean ? revealButton : text}</td><td>${badge(current)}</td><td><button class="table-queue" data-queue-card="${id}" aria-label="${accessibleName}で演習">演習</button></td></tr>`;
+    return `<tr><td><input type="checkbox" data-select-card="${id}" aria-label="${accessibleName}を選ぶ"${selected.has(card.id) ? ' checked' : ''}></td><td class="han-cell">${hideHan ? revealButton : `<span lang="ko">${esc(card.han)}</span>${speechButton(card.han)}`}</td><td class="meaning-cell">${hideMean ? revealButton : text}</td><td>${badge(current)}</td><td><button class="table-queue" data-queue-card="${id}" aria-label="${accessibleName}で演習">演習</button></td></tr>`;
   }).join('') : '<tr><td colspan="5" class="empty-row">該当するカードがありません</td></tr>';
   $('#page-info').textContent = matching.length ? `${page * pageSize + 1} – ${Math.min((page + 1) * pageSize, matching.length)} / ${matching.length}枚` : '0枚';
   $('#prev-page').disabled = page === 0; $('#next-page').disabled = (page + 1) * pageSize >= matching.length;
@@ -316,7 +336,7 @@ function practiceSelected(ids) {
   const selectedCards = cards.filter(card => ids.has(card.id)); if (!selectedCards.length) return;
   const reviewing = settings.sessionType === 'review';
   const eligible = reviewing ? practicePool(selectedCards, records, { ...settings, scope: 'all' }) : selectedCards.filter(card => !mistakeCoolingDown(card, records, settings.mode));
-  if (!eligible.length) { toast(reviewing ? '選んだカードは、この期間の復習履歴がありません。' : '間違えたカードは、解答から2日後に演習できます。復習モードなら今すぐ取り組めます。'); return; }
+  if (!eligible.length) { toast(reviewing ? '選んだカードは、この期間の復習履歴がありません。' : '通常演習では、間違えたカードは2日後から出題します。'); return; }
   if (eligible.length < selectedCards.length) toast(reviewing ? 'この期間に演習したカードを選びました。' : '間違えてから2日未満のカードは除外しました。');
   selected.clear(); startSession(eligible, { all: true }); setView('study'); renderLibrary();
 }
@@ -378,7 +398,7 @@ async function refreshRemote() {
   } catch { notice('教材の更新を確認できませんでした。今の教材で演習を続けられます。'); }
   finally { polling = false; }
 }
-function openSettings() { syncSettingsForm(); renderSettings(); $('#practice-settings').showModal(); }
+function openSettings() { speaker.stop(); syncSettingsForm(); renderSettings(); $('#practice-settings').showModal(); }
 function handleCardAction(action) {
   if (action === 'reveal') reveal();
   else if (action === 'advance') advance();
@@ -391,6 +411,7 @@ function handleCardAction(action) {
 function bind() {
   document.addEventListener('click', event => {
     const target = event.target.closest('button,a'); if (!target) return;
+    if (target.dataset.speak) { speaker.toggle(target.dataset.speak); return; }
     if (target.dataset.deck && loaded) switchDeck(target.dataset.deck);
     if (target.dataset.practiceType && loaded) switchPracticeType(target.dataset.practiceType);
     if (target.dataset.mode && loaded) switchMode(target.dataset.mode);
@@ -461,6 +482,8 @@ function bind() {
   $('#select-page').onchange = event => { pageCards.forEach(card => { if (event.target.checked) selected.add(card.id); else selected.delete(card.id); }); renderLibrary(); };
   $('#queue-selected').onclick = () => practiceSelected(new Set(selected));
   $('#prev-page').onclick = () => { page -= 1; renderLibrary(); }; $('#next-page').onclick = () => { page += 1; renderLibrary(); };
+  window.addEventListener('pagehide', () => speaker.stop());
+  document.addEventListener('visibilitychange', () => { if (document.hidden) speaker.stop(); });
   window.addEventListener('hashchange', () => setView(location.hash.slice(1), { hash: false }));
   document.addEventListener('keydown', event => {
     if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open) return;

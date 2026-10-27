@@ -7,7 +7,7 @@ test('reference words, sentences and search terms remain escaped text', () => {
   const html = renderTopikUsage(rows, '가');
   assert.ok(!html.includes('<script>'));
   assert.ok(!html.includes('<img'));
-  assert.ok(!html.includes('<svg'));
+  assert.ok(!html.includes('<svg onload='));
   assert.ok(html.includes('&lt;script&gt;'));
   assert.ok(html.includes('価格 &amp; 値段'));
   assert.ok(html.includes('<mark class="usage-hit">가</mark>'));
@@ -23,6 +23,7 @@ test('all three columns, optional usage sentences and every hit remain available
   assert.ok(!html.includes('ほか2件を見る'));
   assert.equal((html.match(/<table /g)||[]).length,1);
   assert.equal((html.match(/scope="row"/g)||[]).length,6);
+  assert.equal((html.match(/data-speak=/g)||[]).length,7); // Six words and the available Korean sentence.
   assert.ok(html.includes('aria-label="未記入">—'));
   assert.equal(renderTopikUsage(rows,'없다'),'');
   assert.ok(renderTopikUsage([], '가','error').includes('data-action="reload-examples"'));
