@@ -143,14 +143,71 @@
   .usage-table thead th { padding-left: 7px; padding-right: 7px; }
 }
 
-/* Character references stay as a compact word/translation list. */
+/* Character references reveal available sentences below each word. */
 .usage-compact .usage-table tr > :nth-child(1) { width: 38%; }
 .usage-compact .usage-table tr > :nth-child(2) { width: 31%; }
 .usage-compact .usage-table tr > :nth-child(3) { width: 31%; }
 .usage-compact .usage-table th,
 .usage-compact .usage-table td { padding-top: 10px; padding-bottom: 10px; }
 .usage-compact .usage-word > .speech-button { margin: 0 0 0 4px; }
+.usage-expandable { cursor: pointer; }
+.usage-expandable:hover,
+.usage-expandable:focus-within { background: #f7faff; }
+.usage-expanded { background: #f7faff; }
+.usage-example-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 3px 0 -3px -5px;
+  padding: 3px 5px;
+  border-radius: 5px;
+  color: #3776c8;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.usage-example-toggle:hover { background: #eaf2ff; }
+.usage-example-chevron {
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.usage-example-toggle[aria-expanded="true"] .usage-example-chevron {
+  margin-top: 3px;
+  transform: rotate(225deg);
+}
+.usage-example-row[hidden] { display: none; }
+.usage-table .usage-example-row > td {
+  width: auto;
+  padding: 0 16px 14px;
+  border-top: 0;
+  background: #f7faff;
+}
+.usage-example-content {
+  padding: 12px 14px;
+  border: 1px solid #e1eaf7;
+  border-radius: 8px;
+  background: #fff;
+}
+.usage-table .usage-example-content .usage-sentence {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: #263348;
+  font-size: 14px;
+}
+.usage-table .usage-example-content .usage-sentence + .usage-sentence {
+  margin-top: 9px;
+  color: #667085;
+  font-size: 13px;
+}
 @media(max-width:720px) {
  .usage-compact .usage-table th,
  .usage-compact .usage-table td { padding-top: 8px; padding-bottom: 8px; }
+ .usage-table .usage-example-row > td { padding: 0 9px 10px; }
+ .usage-example-content { padding: 10px 12px; }
 }

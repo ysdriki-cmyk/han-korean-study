@@ -29,17 +29,24 @@ test('vocabulary keeps all three columns, optional usage sentences and every hit
   assert.ok(renderTopikUsage([], '가','error').includes('data-action="reload-examples"'));
 });
 
-test('character references retain every word and word audio without sentences or sentence audio', () => {
-  const rows = Array.from({length:22}, (_,index) => ({korean:`가${index}`,english:'go',japanese:'行く',exampleKo:'가세요',exampleJa:'行ってください'}));
+test('character references reveal sentences only for rows with examples and keep every word', () => {
+  const rows = Array.from({length:22}, (_,index) => ({korean:`가${index}`,english:'go',japanese:'行く',exampleKo:index === 0 || index === 1 ? '가세요' : '',exampleJa:index === 0 || index === 2 ? '行ってください' : ''}));
   const before = JSON.stringify(rows);
   const html = renderTopikUsage(rows, '가', 'ready', {showSentences:false});
   assert.ok(html.includes('usage-compact'));
   assert.ok(html.includes('TOPIK1 · 22件'));
   assert.equal((html.match(/scope="row"/g)||[]).length,22);
-  assert.equal((html.match(/data-speak=/g)||[]).length,22);
-  assert.ok(!html.includes('usage-sentence'));
-  assert.ok(!html.includes('가세요'));
-  assert.ok(!html.includes('行ってください'));
+  assert.equal((html.match(/data-speak=/g)||[]).length,24); // Every word plus the two available Korean sentences.
+  assert.equal((html.match(/data-usage-example-row/g)||[]).length,3);
+  assert.equal((html.match(/data-usage-toggle aria-expanded="false"/g)||[]).length,3);
+  assert.equal((html.match(/class="usage-example-row" hidden/g)||[]).length,3);
+  for (let index = 0; index < 3; index++) {
+    assert.ok(html.includes(`aria-controls="usage-example-${index}"`));
+    assert.ok(html.includes(`id="usage-example-${index}"`));
+  }
+  assert.ok(!html.includes('aria-controls="usage-example-3"'));
+  assert.ok(html.includes('colspan="3"'));
+  assert.ok(html.includes('行ってください'));
   assert.ok(!html.includes('<details'));
   assert.equal(JSON.stringify(rows),before);
   assert.equal(renderTopikUsage(rows,'가'),html);

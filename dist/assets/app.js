@@ -1,7 +1,7 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples } from './topik.js';
-import { renderTopikUsage } from './topik-view.js?v=4';
+import { renderTopikUsage } from './topik-view.js?v=5';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=12';
@@ -410,6 +410,18 @@ function handleCardAction(action) {
 }
 function bind() {
   document.addEventListener('click', event => {
+    const usageRow = event.target.closest('[data-usage-example-row]');
+    const usageToggle = event.target.closest('[data-usage-toggle]') || (!event.target.closest('button,a,input,select,textarea') && usageRow?.querySelector('[data-usage-toggle]'));
+    if (usageToggle) {
+      const example = document.getElementById(usageToggle.getAttribute('aria-controls'));
+      if (!example) return;
+      const expanded = usageToggle.getAttribute('aria-expanded') !== 'true';
+      usageToggle.setAttribute('aria-expanded', String(expanded));
+      usageToggle.closest('[data-usage-example-row]').classList.toggle('usage-expanded', expanded);
+      example.hidden = !expanded;
+      if (!expanded) speaker.stop();
+      return;
+    }
     const target = event.target.closest('button,a'); if (!target) return;
     if (target.dataset.speak) { speaker.toggle(target.dataset.speak); return; }
     if (target.dataset.deck && loaded) switchDeck(target.dataset.deck);
