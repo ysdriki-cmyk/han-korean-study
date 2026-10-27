@@ -142,3 +142,15 @@
   .usage-table td,
   .usage-table thead th { padding-left: 7px; padding-right: 7px; }
 }
+
+/* Character references stay as a compact word/translation list. */
+.usage-compact .usage-table tr > :nth-child(1) { width: 38%; }
+.usage-compact .usage-table tr > :nth-child(2) { width: 31%; }
+.usage-compact .usage-table tr > :nth-child(3) { width: 31%; }
+.usage-compact .usage-table th,
+.usage-compact .usage-table td { padding-top: 10px; padding-bottom: 10px; }
+.usage-compact .usage-word > .speech-button { margin: 0 0 0 4px; }
+@media(max-width:720px) {
+ .usage-compact .usage-table th,
+ .usage-compact .usage-table td { padding-top: 8px; padding-bottom: 8px; }
+}

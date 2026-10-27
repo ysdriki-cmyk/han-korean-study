@@ -4,7 +4,7 @@ import {renderTopikUsage} from '../dist/assets/topik-view.js';
 
 test('reference words, sentences and search terms remain escaped text', () => {
   const rows = [{korean:'가<script>alert(1)</script>',english:'<img src=x onerror=alert(1)>',japanese:'価格 & 値段',exampleKo:'가다 <svg onload=alert(1)>',exampleJa:'「行く」<script>bad()</script>'}];
-  const html = renderTopikUsage(rows, '가');
+  const html = renderTopikUsage(rows, '가', 'ready', {showSentences:true});
   assert.ok(!html.includes('<script>'));
   assert.ok(!html.includes('<img'));
   assert.ok(!html.includes('<svg onload='));
@@ -13,9 +13,9 @@ test('reference words, sentences and search terms remain escaped text', () => {
   assert.ok(html.includes('<mark class="usage-hit">가</mark>'));
 });
 
-test('all three columns, optional usage sentences and every hit remain available', () => {
+test('vocabulary keeps all three columns, optional usage sentences and every hit', () => {
   const rows = Array.from({length:6},(_,i)=>({korean:`가${i}`,english:i ? '' : 'go',japanese:'行く',exampleKo:i ? '' : '가세요',exampleJa:i ? '' : '行ってください'}));
-  const html = renderTopikUsage(rows, '가');
+  const html = renderTopikUsage(rows, '가', 'ready', {showSentences:true});
   assert.ok(html.includes('韓国単語</th><th scope="col">英語</th><th scope="col">日本語'));
   assert.ok(html.includes('가세요'.replace('가','<mark class="usage-hit">가</mark>')));
   assert.ok(html.includes('行ってください'));
@@ -27,4 +27,20 @@ test('all three columns, optional usage sentences and every hit remain available
   assert.ok(html.includes('aria-label="未記入">—'));
   assert.equal(renderTopikUsage(rows,'없다'),'');
   assert.ok(renderTopikUsage([], '가','error').includes('data-action="reload-examples"'));
+});
+
+test('character references retain every word and word audio without sentences or sentence audio', () => {
+  const rows = Array.from({length:22}, (_,index) => ({korean:`가${index}`,english:'go',japanese:'行く',exampleKo:'가세요',exampleJa:'行ってください'}));
+  const before = JSON.stringify(rows);
+  const html = renderTopikUsage(rows, '가', 'ready', {showSentences:false});
+  assert.ok(html.includes('usage-compact'));
+  assert.ok(html.includes('TOPIK1 · 22件'));
+  assert.equal((html.match(/scope="row"/g)||[]).length,22);
+  assert.equal((html.match(/data-speak=/g)||[]).length,22);
+  assert.ok(!html.includes('usage-sentence'));
+  assert.ok(!html.includes('가세요'));
+  assert.ok(!html.includes('行ってください'));
+  assert.ok(!html.includes('<details'));
+  assert.equal(JSON.stringify(rows),before);
+  assert.equal(renderTopikUsage(rows,'가'),html);
 });
