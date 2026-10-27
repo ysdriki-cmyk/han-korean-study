@@ -39,6 +39,9 @@ test('character references reveal sentences only for rows with examples and keep
   assert.equal((html.match(/data-speak=/g)||[]).length,24); // Every word plus the two available Korean sentences.
   assert.equal((html.match(/data-usage-example-row/g)||[]).length,3);
   assert.equal((html.match(/data-usage-toggle aria-expanded="false"/g)||[]).length,3);
+  assert.equal((html.match(/class="usage-word-toggle"/g)||[]).length,3);
+  assert.ok(!html.includes('usage-example-toggle'));
+  assert.ok(!html.includes('usage-example-chevron'));
   assert.equal((html.match(/class="usage-example-row" hidden/g)||[]).length,3);
   for (let index = 0; index < 3; index++) {
     assert.ok(html.includes(`aria-controls="usage-example-${index}"`));

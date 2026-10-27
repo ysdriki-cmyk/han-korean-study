@@ -1,7 +1,7 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples } from './topik.js';
-import { renderTopikUsage } from './topik-view.js?v=5';
+import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=12';

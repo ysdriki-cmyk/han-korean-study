@@ -154,31 +154,16 @@
 .usage-expandable:hover,
 .usage-expandable:focus-within { background: #f7faff; }
 .usage-expanded { background: #f7faff; }
-.usage-example-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  margin: 3px 0 -3px -5px;
-  padding: 3px 5px;
-  border-radius: 5px;
-  color: #3776c8;
-  font-size: 11px;
-  line-height: 1.5;
-  white-space: nowrap;
-}
-.usage-example-toggle:hover { background: #eaf2ff; }
-.usage-example-chevron {
-  width: 6px;
-  height: 6px;
-  margin-top: -3px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg);
-}
-.usage-example-toggle[aria-expanded="true"] .usage-example-chevron {
-  margin-top: 3px;
-  transform: rotate(225deg);
+.usage-word-toggle {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
 }
 .usage-example-row[hidden] { display: none; }
 .usage-table .usage-example-row > td {
