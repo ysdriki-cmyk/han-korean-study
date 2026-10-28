@@ -1,6 +1,8 @@
 # 管理者向け: Cloudflare Pagesで教材を連携する
 
-利用者は「漢字対応」と「単語暗記」の教材を切り替え、「意味を答える」「韓国語を書く」の2モードで学習します。どちらのモードも全ランクのカードをいつでも演習できます。教材CSV、Google Sheetsの接続先、更新間隔は管理者が配信時に設定し、利用者の画面にファイル入出力や接続設定を設けません。
+GitHubからの移行、新しい教材形式、ログイン・履歴の引き継ぎは[移行手順](MIGRATION.md)を参照してください。以下は現在の1教材用CSV中継APIの設定です。
+
+利用者は「한漢」と「単語」の教材を切り替え、쓰기・읽기で学習します。出題ルールは[開発README](../README.md)を参照してください。教材CSV、Google Sheetsの接続先、更新間隔は管理者が配信時に設定し、利用者の画面にファイル入出力や接続設定を設けません。
 
 ## Pagesへ配置する
 
@@ -8,7 +10,7 @@
 | --- | --- |
 | ルートディレクトリ | この `han-korean-study` フォルダ |
 | フレームワーク | なし |
-| ビルドコマンド | 空欄 |
+| ビルドコマンド | `exit 0` |
 | 出力ディレクトリ | `dist` |
 
 `functions/` は `dist/` の外、プロジェクトのルートに置きます。`functions/api/cards.js` が `/api/cards` に対応します。[Cloudflare公式: Functionsの作成](https://developers.cloudflare.com/pages/functions/get-started/)、[ルーティング](https://developers.cloudflare.com/pages/functions/routing/)
@@ -30,7 +32,7 @@ https://docs.google.com/spreadsheets/d/e/公開ID/pub?gid=0&single=true&output=c
 
 同梱教材は漢字650枚・単語4,559枚です。2教材の接続先は別々に管理します。現在の `/api/cards` は環境変数一つで指定した一つのCSVを返すAPIです。両教材を別々のSheetsから中継する場合は、管理者が教材ごとの固定ルートと環境変数を追加してください。利用者のURL引数で任意の取得先を指定する構成にはしません。
 
-初期表示は `defaultDeck: 'vocabulary'`、同梱教材は `decks.vocabulary.fallbackCsvUrl: './data/vocabulary.csv'` と `decks.kanji.fallbackCsvUrl: './data/cards.csv'` です。旧形式のトップ階層 `csvUrl` は漢字教材用の互換設定に限り、新しく設定する場合は `decks` の教材別URLを使います。
+初期表示は `defaultDeck: 'kanji'`、同梱教材は `decks.vocabulary.fallbackCsvUrl: './data/vocabulary.csv'` と `decks.kanji.fallbackCsvUrl: './data/cards.csv'` です。旧形式のトップ階層 `csvUrl` は漢字教材用の互換設定に限り、新しく設定する場合は `decks` の教材別URLを使います。
 
 更新間隔は `config.js` の `refreshIntervalMs`、ブラウザの取得時間の上限は `fetchTimeoutMs` で管理します。利用者による接続操作は不要です。Googleの公開版への更新には数分かかる場合があるため、定期取得でも即時反映は保証できません。[Google公式の更新について](https://support.google.com/docs/answer/183965?hl=ja)
 
@@ -48,7 +50,7 @@ https://docs.google.com/spreadsheets/d/e/公開ID/pub?gid=0&single=true&output=c
 
 ## 学習記録と将来の同期
 
-現在の連携は **Sheets → アプリ** の教材読み取りです。共通ランクと方向別の学習記録は教材ごとに分けて各ブラウザに保存され、スプレッドシートには書き戻しません。利用者のファイル操作をなくしても、端末間の同期が追加されるわけではありません。
+現在の連携は **Sheets → アプリ** の教材読み取りです。評価と学習記録は教材・学習方向ごとに分けて各ブラウザに保存され、スプレッドシートには書き戻しません。利用者のファイル操作をなくしても、端末間の同期が追加されるわけではありません。
 
 保存キー `han-hanja:learning:v3` のカードIDは `kanji:<No>` と `vocabulary:<No>` を使います。教材を追加・更新するときは、これらのIDを変更・再利用しません。
 

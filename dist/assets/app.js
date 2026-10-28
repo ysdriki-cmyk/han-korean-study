@@ -8,8 +8,9 @@ import { practiceSettings, practicePool, makePracticeSession, restorePracticePre
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
 import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review.js?v=2';
 import { icon } from './icons.js?v=3';
-import { createKoreanSpeaker } from './speech.js';
+import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
+import { readingAssessment, speakReadingQuestion } from './reading.js?v=1';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -42,7 +43,10 @@ const speaker = createKoreanSpeaker({
       button.title = active ? '停止' : '読み上げ';
     });
   },
-  onError: code => toast(code === 'unsupported' ? 'このブラウザでは読み上げを利用できません。' : code === 'no-korean-voice' ? '韓国語の音声が見つかりません。端末の音声設定を確認してください。' : '読み上げできませんでした。もう一度お試しください。', true),
+  onError: (code, details) => {
+    console.error('[韓国語音声]', { code, ...details });
+    toast(code === 'unsupported' ? 'このブラウザでは読み上げを利用できません。' : code === 'start-timeout' ? '韓国語音声の開始を確認できませんでした（start-timeout）。もう一度お試しください。' : `韓国語を再生できませんでした（${code}）。もう一度お試しください。`, true);
+  },
 });
 
 function readJSON(key, fallback) {
@@ -153,7 +157,10 @@ function renderSettings() {
   $('#apply-settings').disabled = !amount;
 }
 
-function startSession(custom = null, { all = false } = {}) {
+function speakQuestion() {
+  return speakReadingQuestion({ speaker, card: loaded ? session[position] : null, mode: settings.mode, view, visible: document.visibilityState === 'visible' });
+}
+function startSession(custom = null, { all = false, autoplay = false } = {}) {
   composing = false; compositionEndedAt = 0;
   const eligible = (custom ?? pool()).filter(card => settings.sessionType === 'review' || !mistakeCoolingDown(card, records, settings.mode));
   session = makePracticeSession(eligible, records, { ...settings, limit: all ? 'all' : settings.limit });
@@ -161,20 +168,21 @@ function startSession(custom = null, { all = false } = {}) {
   hintSeeds = new Map(session.map(card => [card.id, Math.floor(Math.random() * Math.max(1, kanjiPromptChoices(card).length))]));
   position = 0; revealed = false; writeResult = null; submitted = ''; answers = new Map(); cardViews = new Map(); advancedPositions = new Set();
   updateCourseChrome(); renderOverview(); renderCard();
+  if (autoplay) speakQuestion();
 }
 function switchDeck(id) {
   if (!DECKS.some(deck => deck.id === id) || id === activeDeck || !deckData.has(id)) return;
   savePreferences(); activeDeck = id; settings = practiceSettings(preferences.courses[id]);
   cards = deckData.get(id).cards; selected.clear(); revealedRows.clear(); rankFilter = 'all'; page = 0;
-  $('#library-search').value = ''; syncSettingsForm(); startSession(); renderLibrary(); savePreferences();
+  $('#library-search').value = ''; syncSettingsForm(); startSession(null, { autoplay: true }); renderLibrary(); savePreferences();
 }
 function switchMode(mode) {
   if (!['read', 'write'].includes(mode) || mode === settings.mode) return;
-  settings.mode = mode; savePreferences(); rankFilter = 'all'; page = 0; startSession(); renderLibrary();
+  settings.mode = mode; savePreferences(); rankFilter = 'all'; page = 0; startSession(null, { autoplay: true }); renderLibrary();
 }
 function switchPracticeType(type) {
   if (!['practice', 'review'].includes(type) || settings.sessionType === type) return;
-  settings.sessionType = type; savePreferences(); startSession(); setView('study'); renderLibrary();
+  settings.sessionType = type; savePreferences(); startSession(); setView('study'); renderLibrary(); speakQuestion();
 }
 function answerRows(card) {
   const main = settings.mode === 'write'
@@ -204,8 +212,8 @@ function questionMarkup(card) {
   }
   return `<p class="question-word reverse" lang="ja">${esc(currentKanjiHint(card))}</p>`;
 }
-function assessmentButtons(selectedRating = null, locked = false) {
-  return `<div class="assessment-buttons" role="group" aria-label="今回の自己評価">${STATUSES.map(item => `<button type="button" class="assessment-button rating-${item.id}" data-rating="${item.id}" aria-label="${esc(item.symbol)} ${esc(item.label)}"${selectedRating ? ` aria-pressed="${item.id === selectedRating}"` : ''}${locked ? ' disabled' : ''}><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span></button>`).join('')}</div>`;
+function assessmentButtons(selectedRating = null) {
+  return `<div class="assessment-buttons" role="group" aria-label="今回の自己評価">${STATUSES.map(item => `<button type="button" class="assessment-button rating-${item.id}" data-rating="${item.id}" aria-label="${esc(item.symbol)} ${esc(item.label)}"${selectedRating ? ` aria-pressed="${item.id === selectedRating}"` : ''}><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span></button>`).join('')}</div>`;
 }
 function cardNavigation() {
   return `<div class="card-navigation"><button type="button" class="button secondary previous-button" data-action="previous"${position === 0 ? ' disabled' : ''}>${icon('arrow')}前へ</button><button type="button" id="next-writing" class="button primary next-button" data-action="advance"${answers.has(position) ? '' : ' disabled'}>次へ${icon('arrow')}</button></div>`;
@@ -230,7 +238,7 @@ function assessmentHistory(card) {
     const item = ratingById.get(event.rating) || UNSEEN;
     const at = new Date(event.at);
     const date = Number.isFinite(at.getTime()) ? at.toLocaleString('ja-JP', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
-    return `<span class="history-entry rating-${item.id}" title="${esc(item.label)}"><strong>${item.symbol}</strong><time>${date}</time>${settings.mode === 'write' && typeof event.correct === 'boolean' ? `<small>${event.correct ? '正解' : '不正解'}</small>` : ''}</span>`;
+    return `<span class="history-entry rating-${item.id}" title="${esc(item.label)}"><strong>${item.symbol}</strong><time>${date}</time>${typeof event.correct === 'boolean' ? `<small>${event.correct ? '正解' : '不正解'}</small>` : ''}</span>`;
   }).join('')}</div></details>`;
 }
 function renderCard() {
@@ -244,15 +252,15 @@ function renderCard() {
     el.innerHTML = `<div class="empty-state"><h2>${settings.sessionType === 'review' ? 'この期間の復習履歴はありません' : scheduled ? '今日の演習は完了' : 'この条件のカードはありません'}</h2>${scheduled ? `<p>次の復習：${new Date(scheduled).toLocaleDateString('ja-JP')}</p>` : ''}<button class="button primary" data-action="settings">出題設定を開く</button></div>`; return;
   }
   if (position >= session.length) { renderComplete(el); return; }
-  const card = session[position], writing = settings.mode === 'write', locked = advancedPositions.has(position);
+  const card = session[position], writing = settings.mode === 'write';
   const selectedRating = answers.get(position)?.rating;
   let actions;
   if (writing && !revealed) actions = '<button type="submit" form="write-form" class="reveal-button" id="check-writing">答えを見る・採点</button>';
   else if (!revealed) actions = '<button id="reveal-card" class="reveal-button" data-action="reveal">答えを見る</button>';
-  else actions = assessmentButtons(selectedRating, locked);
+  else actions = assessmentButtons(selectedRating);
   actions += cardNavigation();
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}"></form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
-  const result = writing && revealed ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
+  const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
   el.innerHTML = `<div class="card-topline"><div class="card-kicker"><span class="card-type">${writing ? esc(getDeck(activeDeck).answerLabel) : '韓国語'}</span><span class="card-number">${position + 1} / ${session.length}${settings.sessionType === 'review' ? ' · 復習' : ''}</span></div>${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}${assessmentHistory(card)}${reviewNote(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState, { showSentences: activeDeck === 'vocabulary' }) : ''}`;
 }
 function renderComplete(el) {
@@ -260,17 +268,29 @@ function renderComplete(el) {
   el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${initialCount}枚${session.length > initialCount ? `＋復習${session.length - initialCount}回` : ''} / ${session.length}回中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions"><button class="button secondary previous-button" data-action="previous">${icon('arrow')}前へ</button><button class="button primary" data-action="next-set">次のセット</button></div></div>`;
 }
 function reveal() {
-  if (!session[position] || revealed || settings.mode !== 'read') return;
-  submitted = $('#recall-input')?.value.trim() || ''; revealed = true; renderCard(); $('.assessment-button')?.focus({ preventScroll: true });
+  const card = session[position];
+  if (!card || revealed || settings.mode !== 'read') return;
+  submitted = $('#recall-input')?.value.trim() || '';
+  const { correct, rating } = readingAssessment(card, submitted, activeDeck);
+  records[card.id] = applyReviewSchedule(recordAssessment(record(card), 'read', rating, { correct }), 'read', rating);
+  answers.set(position, { cardId: card.id, passed: correct === true, correct, rating });
+  writeResult = correct; revealed = true;
+  saveRecords(); saveCardView(); renderOverview(); renderCard(); $('#next-writing')?.focus({ preventScroll: true });
 }
 function rateCard(rating) {
   const card = session[position];
-  if (!card || !revealed || advancedPositions.has(position) || !ratingById.has(rating)) return;
+  if (!card || !revealed || !ratingById.has(rating)) return;
   const writing = settings.mode === 'write';
-  records[card.id] = applyReviewSchedule(recordAssessment(record(card), settings.mode, rating, { correct: null, countAttempt: !writing }), settings.mode, rating);
+  const revisiting = advancedPositions.has(position);
+  records[card.id] = applyReviewSchedule(recordAssessment(record(card), settings.mode, rating, { correct: null, countAttempt: !answers.has(position) }), settings.mode, rating);
   const passed = writing ? answers.get(position)?.passed === true : ['good','solid'].includes(rating);
   answers.set(position, { ...answers.get(position), cardId: card.id, passed, rating });
-  saveRecords(); advance();
+  saveRecords();
+  if (revisiting) {
+    saveCardView(); renderOverview(); renderCard();
+    $(`#flashcard [data-rating="${rating}"]`)?.focus({ preventScroll: true });
+    toast('評価を更新しました');
+  } else advance();
 }
 function checkWriting() {
   const card = session[position]; if (!card || revealed || composing || settings.mode !== 'write') return;
@@ -286,12 +306,12 @@ function advance() {
   saveCardView();
   advancedPositions.add(position);
   position += 1; restoreCardView();
-  renderOverview(); renderCard(); focusCard();
+  renderOverview(); renderCard(); focusCard(); speakQuestion();
 }
 function previous() {
   if (position <= 0) return;
   saveCardView(); position -= 1; restoreCardView();
-  renderOverview(); renderCard(); focusCard();
+  renderOverview(); renderCard(); focusCard(); speakQuestion();
 }
 function setView(next, { hash = true } = {}) {
   speaker.stop();
@@ -338,7 +358,7 @@ function practiceSelected(ids) {
   const eligible = reviewing ? practicePool(selectedCards, records, { ...settings, scope: 'all' }) : selectedCards.filter(card => !mistakeCoolingDown(card, records, settings.mode));
   if (!eligible.length) { toast(reviewing ? '選んだカードは、この期間の復習履歴がありません。' : '通常演習では、間違えたカードは2日後から出題します。'); return; }
   if (eligible.length < selectedCards.length) toast(reviewing ? 'この期間に演習したカードを選びました。' : '間違えてから2日未満のカードは除外しました。');
-  selected.clear(); startSession(eligible, { all: true }); setView('study'); renderLibrary();
+  selected.clear(); startSession(eligible, { all: true }); setView('study'); renderLibrary(); speakQuestion();
 }
 function filteredLibrary(id) { rankFilter = id; page = 0; selected.clear(); renderOverview(); setView('library'); }
 function courseConfig(id) {
@@ -406,7 +426,7 @@ function handleCardAction(action) {
   else if (action === 'reload') location.reload();
   else if (action === 'reload-examples') retryTopikExamples();
   else if (action === 'settings') openSettings();
-  else if (action === 'next-set') startSession();
+  else if (action === 'next-set') startSession(null, { autoplay: true });
 }
 function bind() {
   document.addEventListener('click', event => {
@@ -427,7 +447,7 @@ function bind() {
     if (target.dataset.deck && loaded) switchDeck(target.dataset.deck);
     if (target.dataset.practiceType && loaded) switchPracticeType(target.dataset.practiceType);
     if (target.dataset.mode && loaded) switchMode(target.dataset.mode);
-    if (target.dataset.view) setView(target.dataset.view);
+    if (target.dataset.view) { setView(target.dataset.view); if (target.dataset.view === 'study') speakQuestion(); }
     if (target.dataset.action) handleCardAction(target.dataset.action);
     if (target.dataset.rating) rateCard(target.dataset.rating);
     if (target.dataset.rankFilter) filteredLibrary(target.dataset.rankFilter);
@@ -447,7 +467,7 @@ function bind() {
   $('#flashcard').addEventListener('submit', event => {
     if (event.target.id === 'write-form') { event.preventDefault(); if (!composing) checkWriting(); }
   });
-  $('#new-session').onclick = () => startSession();
+  $('#new-session').onclick = () => startSession(null, { autoplay: true });
   $('#open-settings').onclick = openSettings;
   $('#close-settings').onclick = () => $('#practice-settings').close();
   $('#settings-form').onclick = event => {
@@ -481,7 +501,7 @@ function bind() {
   $('#settings-form').onsubmit = event => {
     event.preventDefault(); if (!practicePool(cards, records, draftSettings).length) return;
     settings = practiceSettings({ ...draftSettings, filter: 'all' });
-    savePreferences(); $('#practice-settings').close(); startSession(); setView('study'); renderLibrary();
+    savePreferences(); $('#practice-settings').close(); startSession(); setView('study'); renderLibrary(); speakQuestion();
   };
   $('#library-search').oninput = () => { page = 0; renderLibrary(); };
   $('#library-hide').onchange = () => { revealedRows.clear(); renderLibrary(); };

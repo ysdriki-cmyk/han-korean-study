@@ -8,39 +8,29 @@ export function koreanVoice(voices = []) {
 }
 
 /** One user-triggered utterance at a time; injected APIs keep lifecycle tests deterministic. */
-export function createKoreanSpeaker({ synthesis, Utterance, onState = () => {}, onError = () => {}, voiceWaitMs = 2000, startWaitMs = 10000 } = {}) {
+export function createKoreanSpeaker({ synthesis, Utterance, onState = () => {}, onError = () => {}, startWaitMs = 10000 } = {}) {
   const supported = !!synthesis && typeof synthesis.speak === 'function' && typeof synthesis.cancel === 'function' && typeof synthesis.getVoices === 'function' && typeof Utterance === 'function';
-  let token = 0, activeText = '', current = null, releaseWait = null, watchdog = null;
-  const voices = () => { try { return synthesis.getVoices(); } catch { return []; } };
+  let token = 0, activeText = '', current = null, voice = null, watchdog = null;
+  function refreshVoices() {
+    try { voice = koreanVoice(synthesis.getVoices() || []); } catch { voice = null; }
+    return voice;
+  }
   const state = (text = '', phase = 'idle') => { activeText = text; onState({ text, phase }); };
   function stop() {
     token += 1;
-    releaseWait?.(); releaseWait = null;
     clearTimeout(watchdog); watchdog = null;
+    const wasActive = !!current;
     if (current) current.onstart = current.onend = current.onerror = null;
     current = null;
-    if (supported) { try { synthesis.cancel(); } catch {} }
+    if (supported && wasActive) { try { synthesis.cancel(); } catch {} }
     state();
   }
-  function fail(code, request) {
+  function fail(code, request, error) {
     if (request !== token) return;
-    stop(); onError(code);
+    const details = { lang: current?.lang || 'ko-KR', voice: current?.voice?.name || null, voiceLang: current?.voice?.lang || null, error };
+    stop(); onError(code, details);
   }
-  function waitForVoice() {
-    return new Promise(resolve => {
-      let timer;
-      const done = () => {
-        clearTimeout(timer); synthesis.removeEventListener?.('voiceschanged', check);
-        releaseWait = null; resolve(koreanVoice(voices()));
-      };
-      const check = () => { if (koreanVoice(voices())) done(); };
-      releaseWait = done;
-      synthesis.addEventListener?.('voiceschanged', check);
-      timer = setTimeout(done, voiceWaitMs);
-      check();
-    });
-  }
-  async function toggle(value) {
+  function toggle(value) {
     const text = speechText(value);
     if (!text) return false;
     if (activeText === text) { stop(); return false; }
@@ -48,12 +38,12 @@ export function createKoreanSpeaker({ synthesis, Utterance, onState = () => {}, 
     const request = ++token;
     if (!supported) { fail('unsupported', request); return false; }
     state(text, 'loading');
-    const voice = koreanVoice(voices()) || await waitForVoice();
-    if (request !== token) return false;
-    if (!voice) { fail('no-korean-voice', request); return false; }
+    const selectedVoice = refreshVoices();
     try {
       const utterance = new Utterance(text); current = utterance;
-      utterance.lang = 'ko-KR'; utterance.voice = voice;
+      // Android may expose no voices even when its TTS engine can speak Korean.
+      utterance.lang = 'ko-KR';
+      if (selectedVoice) utterance.voice = selectedVoice;
       utterance.rate = 0.9; utterance.pitch = 1; utterance.volume = 1;
       utterance.onstart = () => {
         if (request !== token) return;
@@ -63,14 +53,18 @@ export function createKoreanSpeaker({ synthesis, Utterance, onState = () => {}, 
         if (request !== token) return;
         token += 1; clearTimeout(watchdog); watchdog = null; current = null; state();
       };
-      utterance.onerror = event => fail(event?.error || 'synthesis-failed', request);
+      utterance.onerror = event => fail(event?.error || 'synthesis-failed', request, event);
       watchdog = setTimeout(() => fail('start-timeout', request), startWaitMs);
       if (synthesis.paused) synthesis.resume?.();
+      // Stay in the speaker-button click stack: never await voiceschanged here.
       synthesis.speak(utterance);
       return true;
-    } catch { fail('synthesis-failed', request); return false; }
+    } catch (error) { fail(error?.name || 'synthesis-failed', request, error); return false; }
   }
-  // Warm the platform's async voice list before the first tap, without speaking.
-  if (supported) voices();
+  // Update selection before future taps; a late voice list must not start speech.
+  if (supported) {
+    synthesis.addEventListener?.('voiceschanged', refreshVoices);
+    refreshVoices();
+  }
   return { toggle, stop, supported };
 }

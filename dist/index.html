@@ -13,8 +13,9 @@
   <link rel="stylesheet" href="./assets/review.css?v=6">
   <link rel="stylesheet" href="./assets/topik.css?v=6">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
+  <link rel="stylesheet" href="./assets/navigation.css?v=1">
   <script src="./assets/config.js" defer></script>
-  <script type="module" src="./assets/app.js?v=21"></script>
+  <script type="module" src="./assets/app.js?v=24"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -26,15 +27,23 @@
       <button type="button" data-deck="vocabulary" aria-pressed="false">単語<span id="deck-vocabulary-count" hidden>4,559</span></button>
     </div>
   </div>
-  <nav class="main-nav" aria-label="メインメニュー">
-    <button class="nav-item active" data-view="study"><span data-icon="cards"></span>演習</button>
-    <button class="nav-item" data-view="library"><span data-icon="grid"></span>一覧<span id="nav-count" class="nav-count"></span></button>
-    <button class="nav-item" data-view="progress"><span data-icon="chart"></span>記録</button>
-  </nav>
   <span id="save-status" class="save-status">自動保存</span>
 </header>
 <main id="main" tabindex="-1">
   <div id="notice" class="notice" role="status" hidden></div>
+  <section id="study-view" class="view">
+    <h1 class="sr-only">演習</h1>
+    <div class="practice-stage">
+      <div class="session-bar" aria-label="演習の進捗">
+        <span class="session-count"><span class="session-label">進捗</span><strong id="session-done">0</strong><span class="session-divider">/</span><span id="session-total">10</span></span>
+        <div class="session-progress" role="progressbar" aria-label="演習の進捗" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0"><div id="session-progress"></div></div>
+        <span id="session-score" class="session-score">正解 0</span>
+        <button id="new-session" class="restart-button" aria-label="新しいセット" title="新しいセット"><span data-icon="refresh"></span></button>
+      </div>
+      <article id="flashcard" class="flashcard" aria-label="演習カード" aria-busy="true"><div class="loading-state">読み込み中…</div></article>
+    </div>
+  </section>
+  <div class="workspace-controls" role="group" aria-label="演習メニュー">
     <div class="mode-toolbar">
       <div class="mode-switch" role="group" aria-label="演習モード">
         <button data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>
@@ -48,18 +57,12 @@
         <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="出題設定" title="出題設定"><span data-icon="sliders"></span><span>出題設定</span></button>
       </div>
     </div>
-  <section id="study-view" class="view">
-    <h1 class="sr-only">演習</h1>
-    <div class="practice-stage">
-      <div class="session-bar" aria-label="演習の進捗">
-        <span class="session-count"><span class="session-label">進捗</span><strong id="session-done">0</strong><span class="session-divider">/</span><span id="session-total">10</span></span>
-        <div class="session-progress" role="progressbar" aria-label="演習の進捗" aria-valuemin="0" aria-valuemax="10" aria-valuenow="0"><div id="session-progress"></div></div>
-        <span id="session-score" class="session-score">正解 0</span>
-        <button id="new-session" class="restart-button" aria-label="新しいセット" title="新しいセット"><span data-icon="refresh"></span></button>
-      </div>
-      <article id="flashcard" class="flashcard" aria-label="演習カード" aria-busy="true"><div class="loading-state">読み込み中…</div></article>
-    </div>
-  </section>
+    <nav class="main-nav" aria-label="メインメニュー">
+      <button class="nav-item active" data-view="study"><span data-icon="cards"></span>演習</button>
+      <button class="nav-item" data-view="library"><span data-icon="grid"></span>一覧<span id="nav-count" class="nav-count"></span></button>
+      <button class="nav-item" data-view="progress"><span data-icon="chart"></span>記録</button>
+    </nav>
+  </div>
   <section id="library-view" class="view" hidden>
     <div class="page-heading"><h1>カード一覧</h1><span><strong id="library-total">—</strong>枚</span></div>
     <div id="rank-filters" class="status-filters" aria-label="評価で絞り込み"></div>
