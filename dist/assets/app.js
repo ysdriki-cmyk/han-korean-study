@@ -348,6 +348,7 @@ function checkWriting() {
   records[card.id] = applyReviewSchedule(recordAssessment(record(card), 'write', rating, { correct }), 'write', rating);
   answers.set(position, { cardId: card.id, passed: correct === true, correct, rating });
   writeResult = correct; revealed = true; saveRecords(); saveCardView(); renderOverview(); renderCard(); $('#next-writing')?.focus({ preventScroll: true });
+  if (view === 'study' && document.visibilityState === 'visible') speaker.toggle(card.han);
 }
 function advance() {
   if (!session[position] || !answers.has(position)) return;
