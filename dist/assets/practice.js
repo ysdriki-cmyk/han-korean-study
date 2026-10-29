@@ -88,11 +88,12 @@ export function restorePracticePreferences(current, previous = null) {
     return {
       ...saved,
       version: 4,
-      deckId: ['kanji', 'vocabulary'].includes(saved.deckId) ? saved.deckId : 'kanji',
+      deckId: ['kanji', 'vocabulary', 'sentence'].includes(saved.deckId) ? saved.deckId : 'kanji',
       courses: {
         ...saved.courses,
         kanji: practiceSettings(saved.courses.kanji),
         vocabulary: practiceSettings(saved.courses.vocabulary),
+        sentence: practiceSettings(saved.courses.sentence),
       },
     };
   }
@@ -100,7 +101,7 @@ export function restorePracticePreferences(current, previous = null) {
   return {
     version: 4,
     deckId: 'kanji',
-    courses: Object.fromEntries(['kanji', 'vocabulary'].map(id => [id, practiceSettings({ libraryDirection: object(object(legacy.courses)[id]).libraryDirection })])),
+    courses: Object.fromEntries(['kanji', 'vocabulary', 'sentence'].map(id => [id, practiceSettings({ libraryDirection: object(object(legacy.courses)[id]).libraryDirection })])),
   };
 }
 

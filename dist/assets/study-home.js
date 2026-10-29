@@ -70,7 +70,7 @@ export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = 'wr
   const filteredSets = sets.filter(set => (group === 'all' || set.group === group) && (!normalizedQuery || searchValue(`${set.label ?? ''} ${set.group ?? ''}`).includes(normalizedQuery)));
   const groups = [...new Set([...GROUPS, ...sets.map(set => String(set.group ?? ''))])].filter(Boolean);
   const shownGroups = groups.filter(value => value === group || sets.some(set => set.group === value));
-  const modes = [{ id: 'write', label: '쓰기', direction: activeDeck === 'vocabulary' ? '単語→단어' : '漢→한' }, { id: 'read', label: '읽기', direction: activeDeck === 'vocabulary' ? '단어→単語' : '한→漢' }];
+  const modes = [{ id: 'write', label: '쓰기', direction: activeDeck === 'sentence' ? '日→한' : activeDeck === 'vocabulary' ? '単語→단어' : '漢→한' }, { id: 'read', label: '읽기', direction: activeDeck === 'sentence' ? '한→日' : activeDeck === 'vocabulary' ? '단어→単語' : '한→漢' }];
   const selectedMode = mode === 'read' ? 'read' : 'write';
   return `<div class="study-home">
     <h1 class="sr-only">ホーム</h1>

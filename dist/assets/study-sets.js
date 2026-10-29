@@ -3,7 +3,7 @@ import { categoryLabels } from './sheet-fields.js';
 import { ratingFor } from './assessment.js';
 import { practiceCount } from './practice.js';
 
-const DECKS = new Set(['kanji', 'vocabulary']);
+const DECKS = new Set(['kanji', 'vocabulary', 'sentence']);
 const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory']);
 const TAG_FIELDS = new Set(['tags', 'topikCategory']);
 const MAX_CUSTOM_SETS = 100, MAX_RULES = 20, MAX_VALUE = 500, MAX_LABEL = 80;
@@ -106,6 +106,14 @@ export function buildStudySets(deckId, cards, customSets = []) {
   return [...sets, ...normalizeCustomSets(customSets, deckId)];
 }
 
+/** Reuse word-set conditions on the original words, then select only their complete examples. */
+export function projectSentenceSets(wordSets) {
+  return wordSets.filter(set => set.deckId === 'vocabulary').map(set => ({
+    id: `sentence:${set.id}`, label: set.label, group: set.group,
+    kind: 'sentence', deckId: 'sentence', sourceSet: set,
+  }));
+}
+
 function matchesRule(card, rule) {
   if (rule.field === 'essential') {
     const essential = cardDeck(card) === 'kanji' && essentialKanji(card);
@@ -124,12 +132,17 @@ function matchesRule(card, rule) {
 export function cardsForStudySet(cards, set) {
   if (!object(set) || !DECKS.has(set.deckId)) return [];
   const source = deckCards(cards, set.deckId);
+  if (set.kind === 'sentence' && set.deckId === 'sentence' && set.sourceSet?.deckId === 'vocabulary') {
+    const words = source.map(card => card.sourceWord).filter(Boolean);
+    const included = new Set(cardsForStudySet(words, set.sourceSet).map(card => card.id));
+    return source.filter(card => included.has(card.sourceWord?.id));
+  }
   if (set.kind === 'all' && set.id === 'all') return source;
   if (set.kind === 'essential' && set.id === 'essential' && set.deckId === 'kanji') return source.filter(essentialKanji);
-  if (set.kind === 'topik' && set.id === 'topik' && set.deckId === 'vocabulary') {
+  if (set.kind === 'topik' && set.id === 'topik' && ['vocabulary', 'sentence'].includes(set.deckId)) {
     return source.filter(card => Boolean(clean(card.topikCategory)) || card.topik === true);
   }
-  if (set.kind === 'tag' && set.deckId === 'vocabulary' && TAG_FIELDS.has(set.field)
+  if (set.kind === 'tag' && ['vocabulary', 'sentence'].includes(set.deckId) && TAG_FIELDS.has(set.field)
     && typeof set.value === 'string' && clean(set.value) === set.value && set.value
     && categoryLabels(set.value).length === 1 && categoryLabels(set.value)[0] === set.value
     && set.id === tagId(set.field, set.value)) {

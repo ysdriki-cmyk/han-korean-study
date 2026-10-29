@@ -1,0 +1,18 @@
+.flashcard .question-word.sentence-question { max-width: 100%; font-size: clamp(20px, 3.5vw, 30px); line-height: 1.85; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.flashcard[data-mode=write] .sentence-question { font-size: clamp(18px, 3vw, 25px); }
+.flashcard[data-mode=write] .write-form textarea { display: block; width: 100%; min-height: 112px; padding: 14px 16px; border: 1px solid #cbd9ed; border-radius: 10px; background: #fcfdff; color: #263348; font: inherit; font-size: 19px; line-height: 1.75; resize: vertical; }
+.flashcard[data-mode=write] .write-form textarea:focus { outline: 2px solid #84b4f4; outline-offset: 2px; }
+.sentence-answer .answer-value.hangul { font-size: clamp(20px, 3vw, 27px); line-height: 1.8; }
+.sentence-word { margin: 18px 0 12px; padding-top: 16px; border-top: 1px solid #e5eaf1; }
+.sentence-word h3 { margin: 0 0 10px; font-size: 13px; color: #64748b; font-weight: 600; }
+.sentence-word .table-wrap { border: 1px solid #e0e7f0; border-radius: 9px; overflow: hidden; }
+.sentence-word table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.sentence-word th, .sentence-word td { padding: 12px; text-align: left; vertical-align: top; border: 0; overflow-wrap: anywhere; white-space: pre-wrap; font-size: 14px; line-height: 1.7; }
+.sentence-word th { background: #f5f8fc; color: #758196; font-size: 11px; font-weight: 600; }
+.sentence-word td[lang=ko] { font-size: 17px; font-weight: 600; }
+.sentence-word .speech-button { display: inline-flex; vertical-align: middle; }
+@media (max-width: 600px) {
+  .sentence-word th, .sentence-word td { padding: 10px 8px; font-size: 12px; }
+  .sentence-word td[lang=ko] { font-size: 15px; }
+  .flashcard[data-mode=write] .write-form textarea { font-size: 17px; }
+}

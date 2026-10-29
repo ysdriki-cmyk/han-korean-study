@@ -1,4 +1,5 @@
-import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
+import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=2';
+import { sentencesFromVocabulary, matchSentenceAnswer } from './sentences.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -6,21 +7,22 @@ import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
 import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
-import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=13';
+import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=14';
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
 import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review.js?v=3';
 import { icon } from './icons.js?v=3';
 import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
-import { readingAssessment, speakReadingQuestion } from './reading.js?v=1';
-import { buildStudySets, cardsForStudySet, setProgress } from './study-sets.js';
-import { renderStudyHome } from './study-home.js?v=2';
+import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
+import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=2';
+import { renderStudyHome } from './study-home.js?v=3';
 import { parseCategorySheet } from './category-sheet.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = (value = '') => String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const config = window.APP_CONFIG || {};
+const SOURCE_DECKS = DECKS.filter(deck => !deck.sourceDeckId);
 const RECORD_KEY = 'han-hanja:learning:v3', PREF_KEY = 'han-hanja:preferences:v4';
 const SET_PREF_KEY = 'han-hanja:study-sets:v1';
 const STATUSES = [...RATINGS, UNSEEN];
@@ -30,7 +32,7 @@ let draftSettings = null;
 let topikExamples = [], topikState = 'loading';
 const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'home', activeDeck = 'kanji';
-let selectedSetIds = { kanji: 'essential', vocabulary: 'all' }, sheetSets = [], categorySheetText = '', sheetSetsLoaded = false;
+let selectedSetIds = { kanji: 'essential', vocabulary: 'all', sentence: 'default:all' }, sheetSets = [], categorySheetText = '', sheetSetsLoaded = false;
 let homeQuery = '', homeGroup = 'all', homeSearchTimer;
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
@@ -86,6 +88,7 @@ function savePreferences() {
   safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds });
 }
 function availableStudySets(id = activeDeck) {
+  if (id === 'sentence') return projectSentenceSets(availableStudySets('vocabulary')).filter(set => cardsForStudySet(deckData.get('sentence')?.cards || [], set).length);
   const source = deckData.get(id)?.cards || (id === activeDeck ? cards : []);
   const generated = buildStudySets(id, source);
   return sheetSetsLoaded ? sheetSets.filter(set => set.deckId === id) : generated;
@@ -97,9 +100,9 @@ function activeStudySet() {
 function studyCards() { return cardsForStudySet(cards, activeStudySet()); }
 function scopedSettings(candidate = settings) { return { ...candidate, scope: 'all' }; }
 function renderHome() {
-  const courses = ['kanji','vocabulary'].map(id => {
+  const courses = ['kanji','vocabulary','sentence'].map(id => {
     const source = deckData.get(id)?.cards || [];
-    return { id, label: id === 'kanji' ? '한漢' : '単語', count: source.length, available: deckData.has(id), progress: setProgress(source, records, settings.mode) };
+    return { id, label: id === 'kanji' ? '한漢' : getDeck(id).label, count: source.length, available: deckData.has(id), progress: setProgress(source, records, settings.mode) };
   });
   const sets = availableStudySets().map(set => {
     const members = cardsForStudySet(cards, set);
@@ -134,26 +137,16 @@ function counts() {
 function pool() { return practicePool(studyCards(), records, scopedSettings()); }
 function updateCourseChrome() {
   const deck = getDeck(activeDeck), target = deck.answerLabel;
-  $$('[data-deck]').forEach(button => {
-    button.setAttribute('aria-pressed', String(button.dataset.deck === activeDeck));
-    button.disabled = loaded && !deckData.has(button.dataset.deck);
-  });
+  $('.brand strong').textContent = view === 'home' ? '한と漢' : activeDeck === 'kanji' ? '한漢' : deck.label;
   $$('[data-practice-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.practiceType === settings.sessionType)));
   $$('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.mode)));
-  for (const item of DECKS) {
-    const el = $(`#deck-${item.id}-count`);
-    if (el) {
-      el.textContent = deckData.has(item.id) ? deckData.get(item.id).cards.length.toLocaleString('ja-JP') : '—';
-      el.hidden = item.id !== activeDeck;
-    }
-  }
-  $('#read-mode-label').innerHTML = activeDeck === 'vocabulary' ? '읽기<span class="mode-direction">（단어→単語）</span>' : '읽기（한→漢）';
-  $('#write-mode-label').innerHTML = activeDeck === 'vocabulary' ? '쓰기<span class="mode-direction">（単語→단어）</span>' : '쓰기（漢→한）';
+  $('#read-mode-label').innerHTML = activeDeck === 'sentence' ? '읽기<span class="mode-direction">（한→日）</span>' : activeDeck === 'vocabulary' ? '읽기<span class="mode-direction">（단어→単語）</span>' : '읽기（한→漢）';
+  $('#write-mode-label').innerHTML = activeDeck === 'sentence' ? '쓰기<span class="mode-direction">（日→한）</span>' : activeDeck === 'vocabulary' ? '쓰기<span class="mode-direction">（単語→단어）</span>' : '쓰기（漢→한）';
   $('#library-answer-label').textContent = target;
-  const searchText = activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
+  const searchText = activeDeck === 'sentence' ? '例文・単語を検索' : activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
   $('#library-search').placeholder = searchText; $('#library-search').setAttribute('aria-label', searchText);
   $('#active-set-label').textContent = activeStudySet()?.label || 'セット未選択';
-  document.title = view === 'home' ? '한と漢 — 学習セット' : `한と漢 — ${activeDeck === 'vocabulary' ? '単語' : '한漢'}`;
+  document.title = view === 'home' ? '한と漢 — ホーム' : `한と漢 — ${activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}`;
 }
 function renderOverview() {
   const members = studyCards(), totals = counts(), mastered = totals.good + totals.solid;
@@ -253,7 +246,8 @@ function answerRows(card) {
     ? [{label:'正解表記',text:card.answerVariants?.join('\n'),lang:'ko'}, {label:'類語',text:card.synonyms,lang:'ko'}, {label:'解説',text:card.notes,lang:'ja'}]
       .filter(field => field.text).map(field => `<div class="answer-row"><span class="answer-label">${field.label}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('')
     : '';
-  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + examples;
+  const focusWord = activeDeck === 'sentence' && card.sourceWord ? `<section class="sentence-word"><h3>今回の単語</h3><div class="table-wrap"><table><thead><tr><th>韓国語</th><th>英語</th><th>日本語</th></tr></thead><tbody><tr><td lang="ko">${esc(card.sourceWord.han)}${speechButton(card.sourceWord.han)}</td><td lang="en">${esc(card.sourceWord.english || card.sourceWord.meaning || '—')}</td><td lang="ja">${esc(card.sourceWord.kanji || '—')}</td></tr></tbody></table></div></section>` : '';
+  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + examples + focusWord;
 }
 function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);
@@ -261,6 +255,9 @@ function currentKanjiHint(card) {
   return hints.length ? hints[((hintSeeds.get(card.id) || 0) + repeats) % hints.length] : '';
 }
 function questionMarkup(card) {
+  if (activeDeck === 'sentence') return settings.mode === 'read'
+    ? `<div class="question-with-speech"><p class="question-word sentence-question" lang="ko">${esc(card.han)}</p>${speechButton(card.han)}</div>`
+    : `<p class="question-word reverse sentence-question" lang="ja">${esc(card.kanji)}</p>`;
   if (settings.mode === 'read') return `<div class="question-with-speech"><p class="question-word${card.han.length > 4 ? ' long' : ''}" lang="ko">${esc(card.han)}</p>${speechButton(card.han)}</div>`;
   if (activeDeck === 'vocabulary') {
     const japanese = card.kanji, english = card.english || card.meaning;
@@ -291,11 +288,11 @@ function renderCard() {
   speaker.stop();
   const el = $('#flashcard'); el.setAttribute('aria-busy', String(!loaded)); el.dataset.mode = settings.mode; el.classList.toggle('revealed', revealed);
   if (!loaded) return;
-  if (!cards.length) { el.innerHTML = '<div class="empty-state"><h2>データを読み込めませんでした</h2><button class="button primary" data-action="reload">再読み込み</button></div>'; return; }
+  if (!cards.length) { el.innerHTML = activeDeck === 'sentence' ? '<div class="empty-state"><h2>例文がまだありません</h2><button class="button primary" data-view="home">ホームに戻る</button></div>' : '<div class="empty-state"><h2>データを読み込めませんでした</h2><button class="button primary" data-action="reload">再読み込み</button></div>'; return; }
   if (!session.length) {
     const scoped = studyCards();
     const scheduled = settings.sessionType !== 'review' && settings.includeDue && !settings.recentMistakesDays && !settings.excludeRecentDays ? scoped.map(card => nextReviewFor(record(card), settings.mode).dueAt).filter(at => at && Date.parse(at) > Date.now()).sort()[0] : null;
-    el.innerHTML = `<div class="empty-state"><h2>${settings.sessionType === 'review' ? 'この期間の復習履歴はありません' : scheduled ? '今日の演習は完了' : 'この条件のカードはありません'}</h2><button class="button primary" data-action="settings">出題設定を開く</button></div>`; return;
+    el.innerHTML = `<div class="empty-state"><h2>${settings.sessionType === 'review' ? 'この期間の復習履歴はありません' : scheduled ? '今日の演習は完了' : 'この条件のカードはありません'}</h2><button class="button primary" data-view="home">ホームに戻る</button></div>`; return;
   }
   if (position >= session.length) { renderComplete(el); return; }
   const card = session[position], writing = settings.mode === 'write';
@@ -305,9 +302,9 @@ function renderCard() {
   else if (!revealed) actions = '<button id="reveal-card" class="reveal-button" data-action="reveal">答えを見る</button>';
   else actions = assessmentButtons(selectedRating);
   actions += cardNavigation();
-  const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label><input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}"></form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
+  const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label>${activeDeck === 'sentence' ? `<textarea id="hangul-input" rows="3" placeholder="韓国語の例文を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(submitted)}</textarea>` : `<input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}">`}</form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState, { showSentences: activeDeck === 'vocabulary' }) : ''}`;
+  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState, { showSentences: activeDeck === 'vocabulary' }) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
@@ -341,7 +338,7 @@ function rateCard(rating) {
 function checkWriting() {
   const card = session[position]; if (!card || revealed || composing || settings.mode !== 'write') return;
   submitted = $('#hangul-input')?.value.trim() || '';
-  const correct = submitted ? (activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : kanjiAnswersForPrompt(sessionCards, currentKanjiHint(card)).some(answer => matchHangul(submitted, answer))) : null;
+  const correct = submitted ? (activeDeck === 'sentence' ? matchSentenceAnswer(submitted, card.han) : activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : kanjiAnswersForPrompt(sessionCards, currentKanjiHint(card)).some(answer => matchHangul(submitted, answer))) : null;
   const rating = writingAssessment(rank(card), correct);
   records[card.id] = applyReviewSchedule(recordAssessment(record(card), 'write', rating, { correct }), 'write', rating);
   answers.set(position, { cardId: card.id, passed: correct === true, correct, rating });
@@ -379,7 +376,7 @@ function renderLibrary() {
   if (view === 'library') speaker.stop();
   const query = $('#library-search').value.normalize('NFC').trim().toLowerCase();
   const matching = studyCards().filter(card => (rankFilter === 'all' || rank(card) === rankFilter)
-    && (!query || [card.id, card.han, card.kanji, card.hanja, card.meaning, card.english, card.tags, card.topikCategory, card.notes].some(text => String(text || '').normalize('NFC').toLowerCase().includes(query))));
+    && (!query || [card.id, card.han, card.kanji, card.hanja, card.meaning, card.english, card.tags, card.topikCategory, card.notes, card.sourceWord?.han, card.sourceWord?.kanji, card.sourceWord?.english].some(text => String(text || '').normalize('NFC').toLowerCase().includes(query))));
   page = Math.max(0, Math.min(page, Math.ceil(matching.length / pageSize) - 1));
   pageCards = matching.slice(page * pageSize, (page + 1) * pageSize);
   const hide = $('#library-hide').checked;
@@ -415,6 +412,12 @@ function filteredLibrary(id) { rankFilter = id; page = 0; selected.clear(); rend
 function courseConfig(id) {
   const course = config.decks?.[id] || {};
   return { csvUrl: course.csvUrl || (id === 'kanji' ? config.csvUrl : '') || '', fallbackCsvUrl: course.fallbackCsvUrl || (id === 'kanji' ? config.fallbackCsvUrl : '') || getDeck(id).path };
+}
+function updateSentenceDeck() {
+  const vocabulary = deckData.get('vocabulary');
+  if (!vocabulary) return;
+  deckData.set('sentence', { ...vocabulary, cards: sentencesFromVocabulary(vocabulary.cards) });
+  if (activeDeck === 'sentence') cards = deckData.get('sentence').cards;
 }
 async function fetchText(url, deckId) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), config.fetchTimeoutMs || 10000);
@@ -546,7 +549,7 @@ async function refreshRemote() {
   if (polling || document.visibilityState !== 'visible') return; polling = true;
   try {
     const categoryTask = loadCategorySets();
-    const remoteDecks = DECKS.filter(deck => courseConfig(deck.id).csvUrl);
+    const remoteDecks = SOURCE_DECKS.filter(deck => courseConfig(deck.id).csvUrl);
     const results = await Promise.allSettled(remoteDecks.map(deck => fetchText(courseConfig(deck.id).csvUrl, deck.id)));
     let changed = false, referencesChanged = false;
     results.forEach((response, index) => {
@@ -571,6 +574,7 @@ async function refreshRemote() {
     });
     const categoriesChanged = await categoryTask;
     if (changed || categoriesChanged) {
+      updateSentenceDeck();
       updateCourseChrome(); renderOverview(); renderLibrary();
       if (revealed && referencesChanged) renderCard();
     }
@@ -610,7 +614,6 @@ function bind() {
     if (target.hasAttribute('data-set-group')) { homeGroup = target.dataset.setGroup; renderHome(); return; }
     if (target.hasAttribute('data-resume-study')) { setView('study'); speakQuestion(); return; }
     if (target.dataset.speak) { speaker.toggle(target.dataset.speak); return; }
-    if (target.dataset.deck && loaded) switchDeck(target.dataset.deck);
     if (target.dataset.practiceType && loaded) switchPracticeType(target.dataset.practiceType);
     if (target.dataset.mode && loaded) switchMode(target.dataset.mode);
     if (target.dataset.view) { setView(target.dataset.view); if (target.dataset.view === 'study') speakQuestion(); }
@@ -637,8 +640,9 @@ function bind() {
   $('#flashcard').addEventListener('compositionstart', () => { composing = true; });
   $('#flashcard').addEventListener('compositionend', () => { composing = false; compositionEndedAt = performance.now(); });
   $('#flashcard').addEventListener('keydown', event => {
-    if (event.target.id === 'hangul-input' && event.key === 'Enter'
-      && (event.isComposing || composing || event.keyCode === 229 || (compositionEndedAt > 0 && performance.now() - compositionEndedAt < 120))) event.preventDefault();
+    if (event.target.id !== 'hangul-input' || event.key !== 'Enter') return;
+    if (event.isComposing || composing || event.keyCode === 229 || (compositionEndedAt > 0 && performance.now() - compositionEndedAt < 120)) { event.preventDefault(); return; }
+    if (activeDeck === 'sentence' && !event.shiftKey) { event.preventDefault(); checkWriting(); }
   });
   $('#flashcard').addEventListener('submit', event => {
     if (event.target.id === 'write-form') { event.preventDefault(); if (!composing) checkWriting(); }
@@ -707,11 +711,12 @@ async function init() {
   selectedSetIds.kanji = preferences.courses.kanji?.scope === 'all' ? 'all' : 'essential';
   const setPreferences = readJSON(SET_PREF_KEY, null);
   if (setPreferences?.version === 1 && setPreferences.selected && typeof setPreferences.selected === 'object') {
-    for (const id of ['kanji','vocabulary']) if (typeof setPreferences.selected[id] === 'string') selectedSetIds[id] = setPreferences.selected[id];
+    for (const id of ['kanji','vocabulary','sentence']) if (typeof setPreferences.selected[id] === 'string') selectedSetIds[id] = setPreferences.selected[id];
   }
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
-  const results = await Promise.allSettled([...DECKS.map(deck => loadCourse(deck.id)), loadCategorySets()]);
-  results.slice(0, DECKS.length).forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(DECKS[index].id, result.value); });
+  const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets()]);
+  results.slice(0, SOURCE_DECKS.length).forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(SOURCE_DECKS[index].id, result.value); });
+  updateSentenceDeck();
   // A live word snapshot supplies its own references; bundled decks retain the legacy fallback.
   loadTopikExamples().then(examples => { topikExamples = examples; topikState = 'ready'; })
     .catch(() => { topikState = 'error'; })

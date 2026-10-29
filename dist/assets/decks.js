@@ -1,10 +1,12 @@
 import {normalizeCards} from './core.js';
 import {normalizeVocabulary} from './vocabulary.js';
 import {getRecord, migrateLegacy} from './learning.js';
+import {normalizeSentences} from './sentences.js';
 
 export const DECKS = Object.freeze([
   Object.freeze({id:'vocabulary',label:'単語',subtitle:'韓国語 ↔ 日本語・英語',answerLabel:'日本語・英語',answerShort:'訳',answerKicker:'JAPANESE / ENGLISH',path:'./data/vocabulary.csv',parse:normalizeVocabulary}),
-  Object.freeze({id:'kanji',label:'漢字',subtitle:'ハングル ↔ 漢字・意味',answerLabel:'漢字・意味',answerShort:'漢',answerKicker:'KANJI / MEANING',path:'./data/cards.csv',parse:normalizeCards})
+  Object.freeze({id:'kanji',label:'漢字',subtitle:'ハングル ↔ 漢字・意味',answerLabel:'漢字・意味',answerShort:'漢',answerKicker:'KANJI / MEANING',path:'./data/cards.csv',parse:normalizeCards}),
+  Object.freeze({id:'sentence',label:'sentence',subtitle:'韓国語の例文 ↔ 日本語の例文',answerLabel:'日本語',answerShort:'日',path:'./data/vocabulary.csv',sourceDeckId:'vocabulary',parse:normalizeSentences})
 ]);
 export function getDeck(id){return DECKS.find(deck=>deck.id===id)||DECKS[0];}
 export function namespaceCards(cards,deckId){
@@ -14,7 +16,7 @@ export function namespaceCards(cards,deckId){
 export function parseDeck(deckId,text){
   const deck=getDeck(deckId);
   const result=deck.parse(text);
-  if(!result.cards.length)throw new Error('学習できることばがありません。');
+  if(!result.cards.length && deck.id!=='sentence')throw new Error('学習できることばがありません。');
   return {...result,cards:namespaceCards(result.cards,deck.id)};
 }
 
@@ -26,7 +28,7 @@ export function restoreLearningRecords(current,previous,legacy){
     for(const [oldId,value] of Object.entries(map)){
       if(!value||typeof value!=='object'||Array.isArray(value))continue;
       const id=current?.version===3?oldId:`kanji:${oldId}`;
-      if(!/^(kanji|vocabulary):.+$/.test(id))continue;
+      if(!/^(kanji|vocabulary|sentence):.+$/.test(id))continue;
       output[id]=getRecord({id,state:'',flagged:false},{[id]:value});
     }
     return output;
@@ -42,7 +44,7 @@ export function restoreLearningRecords(current,previous,legacy){
 
 /** Question/answer content never includes a Korean example as a reverse hint. */
 export function answerFields(card,deckId){
-  const fields=deckId==='vocabulary'
+  const fields=deckId==='sentence' ? [{label:'日本語',text:card.kanji,lang:'ja'}] : deckId==='vocabulary'
     ? [{label:'日本語',text:card.kanji,lang:'ja'},{label:'英語',text:card.english||card.meaning,lang:'en'}]
     : [{label:'漢字・意味',text:card.kanji,lang:'ja'},{label:'漢字候補',text:card.hanja,lang:'ja'},{label:'補足',text:card.meaning,lang:'ja'}];
   const seen=new Set();

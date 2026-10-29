@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#2879ec">
-  <meta name="description" content="漢字と韓国語の対応テスト、韓国語の単語暗記。意味を答える・韓国語を書く、2つのモードで演習。">
+  <meta name="description" content="漢字と韓国語の対応、単語、例文を学ぶ韓国語の演習。読み書きのテストと復習で記憶を定着。">
   <title>한と漢 — 韓国語の演習</title>
   <link rel="icon" href="./assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./assets/practice.css?v=4">
@@ -14,19 +14,16 @@
   <link rel="stylesheet" href="./assets/topik.css?v=6">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
   <link rel="stylesheet" href="./assets/navigation.css?v=1">
-  <link rel="stylesheet" href="./assets/study-home.css?v=2">
+  <link rel="stylesheet" href="./assets/study-home.css?v=3">
+  <link rel="stylesheet" href="./assets/sentences.css?v=1">
   <script src="./assets/config.js?v=3" defer></script>
-  <script type="module" src="./assets/app.js?v=30"></script>
+  <script type="module" src="./assets/app.js?v=31"></script>
 </head>
 <body data-view="home">
 <a class="skip-link" href="#main">演習へ移動</a>
 <header class="app-header">
   <div class="header-identity">
     <a class="brand" href="#home" aria-label="한と漢 ホーム"><span class="brand-mark">한</span><strong>한と漢</strong></a>
-    <div class="course-tabs" role="group" aria-label="教材">
-      <button type="button" data-deck="kanji" aria-pressed="true">한漢<span id="deck-kanji-count">650</span></button>
-      <button type="button" data-deck="vocabulary" aria-pressed="false">単語<span id="deck-vocabulary-count" hidden>4,559</span></button>
-    </div>
   </div>
   <span id="save-status" class="save-status">自動保存</span>
 </header>

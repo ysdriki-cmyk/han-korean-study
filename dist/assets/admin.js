@@ -1,5 +1,5 @@
 import { DECKS } from './decks.js';
-import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=2';
+import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=3';
 import { readContentSnapshot } from './content-cache.js?v=2';
 import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=2';
 import { nextReviewFor } from './review.js?v=3';
@@ -17,7 +17,7 @@ const routes = {
   guide: { path: '/admin/guide/', title: '更新ガイド', label: 'ガイド' },
 };
 const config = window.APP_CONFIG || {};
-const contentIds = [...DECKS.map(deck => deck.id), ...(config.categorySetsCsvUrl ? ['category_enshu'] : [])];
+const contentIds = [...DECKS.filter(deck => !deck.sourceDeckId).map(deck => deck.id), ...(config.categorySetsCsvUrl ? ['category_enshu'] : [])];
 const results = new Map();
 let checking = false;
 const storage = { getItem: key => localStorage.getItem(key) };
@@ -85,6 +85,7 @@ function renderContent() {
       if (id !== 'category_enshu') facts += fact(id === 'kanji' ? '必須文字' : 'TOPIK1参考例', `${number(id === 'kanji' ? data.essential : data.references)} 件`);
       facts += fact('CSVのデータ行', `${number(data.rawRows)} 行`);
       if (id === 'vocabulary') facts += fact('保持している分類', `${number(data.categories)} 種類`);
+      if (id === 'vocabulary') facts += fact('sentence対象', `${number(data.sentences)} 件（例文の両言語あり）`);
     }
     facts += fact('通常画面の前回読込', previous ? badge(sourceName(id, previous.source), previous.source === 'remote' ? 'ok' : 'warn') + `<span class="small">${number(previous.cardCount)}${contentUnit(id)} · ${esc(formatTime(previous.checkedAt))}</span>` : '未記録（通常画面を一度開くと記録）');
     facts += dateFact('通常画面の取得成功', previous?.lastSuccessAt);

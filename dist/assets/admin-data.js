@@ -3,6 +3,7 @@ import { parseDeck } from './decks.js';
 import { sheetHeader } from './sheet-fields.js';
 import { essentialKanji } from './kanji.js';
 import { examplesFromVocabulary } from './topik.js';
+import { sentencesFromVocabulary } from './sentences.js';
 import { parseCategorySheet, CATEGORY_SHEET_HEADERS } from './category-sheet.js';
 
 const common = [
@@ -26,8 +27,8 @@ const fields = {
     { names: ['別解','正解表記','acceptedanswers'], use: '追加で正解と認める韓国語。複数はセル内改行。任意。' },
     { names: ['類語','synonyms'], use: '解答後に表示。自動採点の正解には追加しない。任意。' },
     { names: ['カテゴリ','tags','タグ','#chat'], use: '分類名を保持。テーマ別の出題画面は今後の対応。' },
-    { names: ['例文_韓国語','exampleko','example_ko','例文（韓国語）','例文(韓国語)'], use: '解答後に表示する韓国語の例文・読み上げ。' },
-    { names: ['例文_日本語','examplejp','example_jp','例文（日本語）','例文(日本語)'], use: '例文の日本語訳。解答後に表示。' },
+    { names: ['例文_韓国語','exampleko','example_ko','例文（韓国語）','例文(韓国語)'], use: '単語の解答後に表示。日本語の例文とそろった行はsentenceの韓国語問題・正解にも使用。' },
+    { names: ['例文_日本語','examplejp','example_jp','例文（日本語）','例文(日本語)'], use: '例文の日本語訳。韓国語の例文とそろった行はsentenceの日本語問題・正解にも使用。' },
     { names: ['解説','notes','備考','メモ'], use: '解答後の補足。問題のヒントや採点の別解には使わない。' },
     { names: ['topik1'], use: '空欄でない行を使用参考例に採用。#shopなどの分類名も保持。' },
   ],
@@ -70,6 +71,7 @@ export function inspectContent(deckId, text) {
     rawRows: rows.slice(1).filter(row => row.some(value => String(value).trim())).length,
     essential: deckId === 'kanji' ? result.cards.filter(essentialKanji).length : null,
     references: deckId === 'vocabulary' ? examplesFromVocabulary(result.cards).length : null,
+    sentences: deckId === 'vocabulary' ? sentencesFromVocabulary(result.cards).length : null,
     warnings: result.warnings,
     categories: deckId === 'vocabulary' ? new Set(result.cards.flatMap(card => card.categories || [])).size : null,
     columns,
@@ -111,7 +113,7 @@ export function summarizeLearning(value) {
   const summary = { records: 0, writing: 0, reading: 0 };
   if (value?.version !== 3 || !value.records || typeof value.records !== 'object' || Array.isArray(value.records)) return summary;
   for (const [id, record] of Object.entries(value.records)) {
-    if (!/^(kanji|vocabulary):.+$/.test(id) || !record || typeof record !== 'object' || Array.isArray(record)) continue;
+    if (!/^(kanji|vocabulary|sentence):.+$/.test(id) || !record || typeof record !== 'object' || Array.isArray(record)) continue;
     summary.records += 1;
     for (const [mode, key] of [['write','writing'],['read','reading']]) {
       const attempts = record.assessments?.[mode]?.attempts;
