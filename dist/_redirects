@@ -1,1 +1,4 @@
-/admin/* /admin/index.html 200
+/admin/content/ /admin/ 200
+/admin/schema/ /admin/ 200
+/admin/storage/ /admin/ 200
+/admin/guide/ /admin/ 200
