@@ -8,7 +8,7 @@
 
 GitHubにはこのフォルダ全体を登録し、Cloudflare Pagesの公開先を `dist` にする。`functions/` は `dist/` の外に置く。兄弟フォルダの `Korea flash card/`、`archive/`、スクリーンショットは現在のアプリの配信には使わない。
 
-最初の接続と運用手順は[GitHub・Cloudflareへの移行](cloudflare/MIGRATION.md)を参照する。
+最初の接続と運用手順は[GitHub・Cloudflareへの移行](cloudflare/MIGRATION.md)を参照する
 
 ## 教材
 
