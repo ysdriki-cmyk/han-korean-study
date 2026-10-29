@@ -108,7 +108,7 @@ Galaxy / Android Chromeでの実機確認（実機では未確認）：
 
 ## 開発
 
-教材の外部連携には[教材スプレッドシートの形式案](docs/content-schema.md)、独自環境への移行には[GitHub・Cloudflareの移行手順](cloudflare/MIGRATION.md)を参照する。新フォーマットと3教材の外部APIは設計段階で、切り替え前に現行IDとの互換性を検証する。
+教材の外部連携には[教材スプレッドシートの形式](docs/content-schema.md)、独自環境への移行には[GitHub・Cloudflareの移行手順](cloudflare/MIGRATION.md)を参照する。外部連携は「한漢」「単語」の2シート構成とし、TOPIK1は単語シートのチェック列に統合する設計。新フォーマットの読込と外部APIは未実装で、切り替え前に現行IDとの互換性を検証する。
 
 ビルド不要のES Modules。`dist/`を静的配信する。CSVを取得するためHTTPサーバーで確認する。
 
