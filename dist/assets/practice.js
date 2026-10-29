@@ -2,7 +2,7 @@ import { RANKS, getRecord } from './learning.js';
 import { makeSession } from './core.js';
 import { RATINGS, filterAssessments } from './assessment.js';
 import { essentialKanji } from './kanji.js';
-import { reviewDue } from './review.js?v=2';
+import { reviewDue } from './review.js?v=3';
 
 const FILTERS = new Set(['all', 'review', ...RANKS.map(rank => rank.id)]);
 const RATING_IDS = [...RATINGS.map(item => item.id), 'unseen'];

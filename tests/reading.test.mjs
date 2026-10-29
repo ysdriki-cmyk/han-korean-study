@@ -16,7 +16,7 @@ test('blank Korean-first answers default to unsure without marking them right or
   assert.equal(record.assessments.read.attempts,1);
   assert.equal(record.assessments.read.correct,0);
   assert.equal(record.assessments.read.wrong,0);
-  assert.equal(nextReviewFor(record,'read',NOW).intervalDays,1);
+  assert.equal(nextReviewFor(record,'read',NOW).intervalDays,5);
 });
 
 test('explicit Japanese and English translations produce good without guessed synonyms or substrings', () => {

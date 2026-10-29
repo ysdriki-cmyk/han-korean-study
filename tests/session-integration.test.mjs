@@ -73,7 +73,7 @@ test('revising an earlier card from good to again and back changes only that att
     assert.equal(restored.assessments[mode].history.length,2);
     assert.equal(restored.assessments[mode].history.at(-1).correct,true);
     assert.equal(restored.assessments[mode].attempts,2);
-    assert.equal(Date.parse(restored.assessments[mode].dueAt),NOW+DAY);
+    assert.equal(Date.parse(restored.assessments[mode].dueAt),NOW+5*DAY);
     assert.equal(JSON.stringify(records[second.id]),otherCard);
     assert.equal(JSON.stringify(records),original);
   }

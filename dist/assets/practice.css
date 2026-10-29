@@ -102,7 +102,7 @@ main { max-width: 1176px; margin: 0 auto; padding: 24px 28px 36px; outline: 0; }
 .restart-button:hover { background: #f0f5fd; color: var(--blue); }
 .restart-button svg { width: 18px; height: 18px; }
 .flashcard { display: flex; flex-direction: column; min-height: 346px; }
-.card-topline { padding: 20px 28px 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.card-topline { padding: 20px 28px 0; display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 .card-kicker { display: flex; align-items: center; gap: 12px; }
 .card-type { color: #526075; font-size: 12px; font-weight: 500; }
 .card-number { color: #7a8699; font-size: 12px; font-variant-numeric: tabular-nums; padding-left: 12px; border-left: 1px solid #e0e5ec; }

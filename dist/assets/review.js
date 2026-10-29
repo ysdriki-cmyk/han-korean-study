@@ -4,7 +4,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const MODES = new Set(['read', 'write']);
 const RATINGS = new Set(['hard', 'again', 'unsure', 'good', 'solid', 'unseen']);
 const MISTAKE_INTERVAL_DAYS = 2;
-const INTERVALS = Object.freeze({ good: [1, 3, 7, 14, 30], solid: [3, 7, 14, 30, 60] });
+const RECALL_INTERVAL_DAYS = 5;
+const INTERVALS = Object.freeze({ good: [5, 7, 14, 30, 60], solid: [5, 14, 30, 60, 90] });
 const object = value => value && typeof value === 'object' && !Array.isArray(value) ? value : {};
 const timestamp = value => {
   const result = value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(value);
@@ -36,6 +37,15 @@ function withMistakeInterval(schedule, assessment) {
   const anchor = timestamp(object(history.at(-1)).at) ?? timestamp(source.lastAt) ?? floor - MISTAKE_INTERVAL_DAYS * DAY;
   return { dueAt: new Date(floor).toISOString(), intervalDays: Math.ceil((floor - anchor) / DAY) };
 }
+function withRecallInterval(schedule, assessment, rating) {
+  const source = object(assessment), history = Array.isArray(source.history) ? source.history : [];
+  const latest = object(history.at(-1));
+  const anchor = timestamp(latest.at) ?? timestamp(source.lastAt);
+  // Reinterpret older short schedules from the original attempt, without a storage migration.
+  if (anchor === null || latest.correct === false || !['unsure', 'good', 'solid'].includes(rating)) return schedule;
+  const floor = anchor + RECALL_INTERVAL_DAYS * DAY;
+  return timestamp(schedule.dueAt) >= floor ? schedule : { dueAt: new Date(floor).toISOString(), intervalDays: RECALL_INTERVAL_DAYS };
+}
 
 function calculatedSchedule(assessment, rating, now) {
   const source = object(assessment);
@@ -45,7 +55,7 @@ function calculatedSchedule(assessment, rating, now) {
   let intervalDays = 0;
   if (latest.correct === false || ['hard', 'again'].includes(rating)) intervalDays = MISTAKE_INTERVAL_DAYS;
   else {
-    if (rating === 'unsure') intervalDays = 1;
+    if (rating === 'unsure') intervalDays = RECALL_INTERVAL_DAYS;
     else if (INTERVALS[rating]) {
       let streak = 0;
       for (let index = history.length - 1; index >= 0 && successful(history[index]); index -= 1) streak += 1;
@@ -66,10 +76,10 @@ export function nextReviewFor(record, mode = 'read', now = Date.now()) {
   const assessment = object(object(object(record).assessments)[mode]);
   const storedDue = timestamp(assessment.dueAt);
   if (storedDue !== null) {
-    return withMistakeInterval({
+    return withRecallInterval(withMistakeInterval({
       dueAt: new Date(storedDue).toISOString(),
       intervalDays: Number.isFinite(Number(assessment.intervalDays)) && Number(assessment.intervalDays) >= 0 ? Number(assessment.intervalDays) : 0,
-    }, assessment);
+    }, assessment), assessment, assessment.rating);
   }
   const history = Array.isArray(assessment.history) ? assessment.history : [];
   const hasDatedAttempt = timestamp(object(history.at(-1)).at) !== null || timestamp(assessment.lastAt) !== null;

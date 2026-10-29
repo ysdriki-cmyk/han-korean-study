@@ -115,10 +115,10 @@ test('due successful or uncertain cards rejoin the default pool after their save
   const saved = Object.fromEntries(source.slice(0, 3).map(card => [card.id, assessed(card, card.id.split(':')[1])]));
   const defaults = practiceSettings();
   assert.deepEqual(practicePool(source, saved, defaults, timestamp), []);
-  assert.deepEqual(practicePool(source, saved, defaults, afterDays(1)).map(card => card.id), ['vocabulary:unsure', 'vocabulary:good']);
-  assert.deepEqual(practicePool(source, saved, defaults, afterDays(3)).map(card => card.id), ['vocabulary:unsure', 'vocabulary:good', 'vocabulary:solid']);
-  assert.equal(practicePool(source, saved, { ...defaults, includeDue:false }, afterDays(3)).length, 0);
-  assert.equal(practicePool(source, saved, { ...defaults, ratings:[] }, afterDays(3)).length, 0);
+  assert.deepEqual(practicePool(source, saved, defaults, afterDays(4)), []);
+  assert.deepEqual(practicePool(source, saved, defaults, afterDays(5)).map(card => card.id), ['vocabulary:unsure', 'vocabulary:good', 'vocabulary:solid']);
+  assert.equal(practicePool(source, saved, { ...defaults, includeDue:false }, afterDays(5)).length, 0);
+  assert.equal(practicePool(source, saved, { ...defaults, ratings:[] }, afterDays(5)).length, 0);
   assert.equal(practicePool(source, saved, { ...defaults, ratings:['good','solid'] }, timestamp).length, 1); // Undated legacy status can still be selected explicitly.
 });
 
@@ -126,9 +126,9 @@ test('due supplements still obey recent-practice exclusion and dated-mistake fil
   const card = {id:'vocabulary:spaced', han:'가'};
   const saved = {[card.id]:assessed(card, 'good', {correct:true})};
   const defaults = practiceSettings();
-  assert.equal(practicePool([card], saved, defaults, afterDays(1)).length, 1);
-  assert.equal(practicePool([card], saved, { ...defaults, excludeRecentDays:3 }, afterDays(1)).length, 0);
-  assert.equal(practicePool([card], saved, { ...defaults, recentMistakesDays:7 }, afterDays(1)).length, 0);
+  assert.equal(practicePool([card], saved, defaults, afterDays(5)).length, 1);
+  assert.equal(practicePool([card], saved, { ...defaults, excludeRecentDays:7 }, afterDays(5)).length, 0);
+  assert.equal(practicePool([card], saved, { ...defaults, recentMistakesDays:7 }, afterDays(5)).length, 0);
   const wrong = assessed(card, 'solid', {correct:false});
   assert.equal(practicePool([card], {[card.id]:wrong}, { ...defaults, recentMistakesDays:7 }, afterDays(1)).length, 0);
   assert.equal(practicePool([card], {[card.id]:wrong}, { ...defaults, recentMistakesDays:7 }, afterDays(2)).length, 1);

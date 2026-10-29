@@ -2,6 +2,7 @@ import { DECKS } from './decks.js';
 import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=2';
 import { readContentSnapshot } from './content-cache.js?v=2';
 import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=2';
+import { nextReviewFor } from './review.js?v=3';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -102,7 +103,8 @@ function renderSchema() {
   }).join('');
 }
 function renderStorage() {
-  const summary = summarizeLearning(readJSON('han-hanja:learning:v3'));
+  const learning = readJSON('han-hanja:learning:v3');
+  const summary = summarizeLearning(learning);
   const keys = [
     ['han-hanja:learning:v3', '評価・回数・履歴・復習日'],
     ['han-hanja:preferences:v4', '教材・読み書き・出題設定'],
@@ -119,6 +121,15 @@ function renderStorage() {
     return `<tr><td><code>${key}</code></td><td>${purpose}</td><td>${raw ? '保存あり' : '未保存'}</td><td>${size}</td></tr>`;
   }).join('');
   $('#storage-summary').innerHTML = `<dl class="facts">${fact('保存領域の読み取り', readable ? badge('利用可能', 'ok') : badge('利用できません', 'error'))}${fact('記録のあるカード', `${number(summary.records)} 枚`)}${fact('쓰기の試行回数', `${number(summary.writing)} 回`)}${fact('읽기の試行回数', `${number(summary.reading)} 回`)}</dl><div class="table-wrap storage-keys"><table><thead><tr><th>保存キー</th><th>内容</th><th>状態</th><th>サイズ</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const schedules = learning?.version === 3 && learning.records && typeof learning.records === 'object'
+    ? Object.entries(learning.records).flatMap(([id, record]) => ['write', 'read'].flatMap(mode => {
+      const assessment = record?.assessments?.[mode];
+      if (!assessment) return [];
+      const schedule = nextReviewFor(record, mode);
+      return schedule.dueAt ? [{ id, mode, assessment, ...schedule }] : [];
+    })).sort((a, b) => (Date.parse(b.assessment.lastAt) || 0) - (Date.parse(a.assessment.lastAt) || 0)).slice(0, 30) : [];
+  const symbols = { hard: '❌❌❌', again: '❌', unsure: '△', good: '○', solid: '◎', unseen: 'ー' };
+  $('#storage-summary').insertAdjacentHTML('beforeend', `<h3>復習予定（最新30件）</h3>${schedules.length ? `<div class="table-wrap"><table><thead><tr><th>カードID</th><th>方向</th><th>評価</th><th>最終演習</th><th>次の復習</th><th>間隔</th></tr></thead><tbody>${schedules.map(row => `<tr><td><code>${esc(row.id)}</code></td><td>${row.mode === 'write' ? '쓰기' : '읽기'}</td><td>${symbols[row.assessment.rating] || 'ー'}</td><td>${esc(formatTime(row.assessment.lastAt))}</td><td>${esc(formatTime(row.dueAt))}</td><td>${number(row.intervalDays)}日</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">このブラウザには、日時付きの演習記録がまだありません。</p>'}`);
 }
 function render() { renderOverview(); renderContent(); renderSchema(); renderStorage(); }
 

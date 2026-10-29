@@ -73,8 +73,9 @@ export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = 'wr
   const modes = [{ id: 'write', label: '쓰기', direction: activeDeck === 'vocabulary' ? '単語→단어' : '漢→한' }, { id: 'read', label: '읽기', direction: activeDeck === 'vocabulary' ? '단어→単語' : '한→漢' }];
   const selectedMode = mode === 'read' ? 'read' : 'write';
   return `<div class="study-home">
-    <div class="home-heading"><h1>学習セット</h1>${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
+    <h1 class="sr-only">ホーム</h1>
     <div class="home-courses" role="group" aria-label="教材を選ぶ">${courses.map(course => courseCard(course, activeDeck)).join('')}</div>
+    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" data-start-practice${available ? '' : ' disabled'}>演習を開始する<span aria-hidden="true">→</span></button>${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
     <section class="home-sets" aria-labelledby="home-sets-title">
       <div class="home-sets-heading"><h2 id="home-sets-title">${esc(selectedCourse?.label ?? (activeDeck === 'vocabulary' ? '単語' : '한漢'))}<span>のセット</span></h2><div class="home-mode-switch" role="group" aria-label="演習モード">${modes.map(item => `<button type="button" data-home-mode="${item.id}" aria-pressed="${selectedMode === item.id}" title="${esc(item.direction)}"><strong lang="ko">${item.label}</strong><span>${esc(item.direction)}</span></button>`).join('')}</div></div>
       <div class="home-set-tools"><label class="home-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="set-search" type="search" value="${esc(query)}" aria-label="学習セットを検索" placeholder="セットを検索" autocomplete="off"></label>${canCreate ? '<button type="button" class="home-button home-create" data-create-set aria-haspopup="dialog"><span aria-hidden="true">＋</span>セットを作成</button>' : ''}</div>
