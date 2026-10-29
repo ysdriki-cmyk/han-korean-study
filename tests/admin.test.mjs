@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DIAGNOSTICS_KEY, readContentDiagnostics, recordContentDiagnostics } from '../dist/assets/content-diagnostics.js';
 import { readContentCache, readContentSnapshot, writeContentCache } from '../dist/assets/content-cache.js';
-import { columnLetter, inspectContent, summarizeLearning } from '../dist/assets/admin-data.js';
+import { columnLetter, inspectContent, inspectCategoryContent, summarizeLearning } from '../dist/assets/admin-data.js';
 
 function memoryStorage() {
   const entries = new Map([['han-hanja:learning:v3', 'untouched learning records']]);
@@ -97,4 +97,37 @@ test('local learning summaries expose counts only and ignore malformed or foreig
   } });
   assert.deepEqual(summary, { records: 2, writing: 5, reading: 1 });
   assert.deepEqual(summarizeLearning({ version: 2, records: {} }), { records: 0, writing: 0, reading: 0 });
+});
+
+test('category inspection follows real columns and retains valid definitions with warnings', () => {
+  const header = 'カテゴリ名,category_id,教材,対象列,条件,値,条件の結合,表示順';
+  const result = inspectCategoryContent(header + '\n必須,required,one,必須,印あり,,AND,1\n不正,bad,word,未知の列,含む,x,AND,2');
+  assert.equal(result.valid, true);
+  assert.equal(result.count, 1);
+  assert.equal(result.rawRows, 2);
+  assert.ok(result.warnings.length);
+  assert.equal(result.columns[1].cell, 'B1');
+  assert.equal(result.columns[1].sampleCell, 'B2');
+  assert.equal(result.columns[1].sample, 'required');
+});
+
+test('empty or header-only category sheets cannot be mistaken for usable sets', () => {
+  const header = 'category_id,カテゴリ名,教材,対象列,条件,値,条件の結合,表示順';
+  for (const text of ['', header, header + '\nbad,不正,word,未知の列,含む,x,AND,1']) {
+    const result = inspectCategoryContent(text);
+    assert.equal(result.valid, false);
+    assert.equal(result.count, 0);
+    assert.ok(result.error);
+  }
+  assert.equal(inspectCategoryContent(header).columns.length, 8);
+});
+
+test('category source diagnostics stay separate from both learning decks', () => {
+  const storage = memoryStorage();
+  recordContentDiagnostics(storage, 'category_enshu', { source: 'unavailable', error: '条件行がありません。' });
+  const state = readContentDiagnostics(storage);
+  assert.equal(state.decks.category_enshu.source, 'unavailable');
+  assert.equal(state.decks.kanji, undefined);
+  assert.equal(state.decks.vocabulary, undefined);
+  assert.equal(storage.getItem('han-hanja:learning:v3'), 'untouched learning records');
 });

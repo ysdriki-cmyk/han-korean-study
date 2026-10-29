@@ -26,11 +26,11 @@
 
 ## 演習セット用の追加シート
 
-`category_enshu` の入力形式は[カテゴリ設定](../docs/category-sets.md)と[サンプルCSV](../docs/templates/category_enshu.csv)を参照する。現在は公開URLが未共有のため未接続で、ホームは基本セットと既存教材のタグを表示する。
+`category_enshu` の入力形式は[カテゴリ設定](../docs/category-sets.md)と[サンプルCSV](../docs/templates/category_enshu.csv)を参照する。公開URL（gid `297489818`）は `functions/api/category-sets.js` に設定済み。アプリの `categorySetsCsvUrl` は `/api/category-sets` を使う。接続先を変える場合だけ環境変数 `CATEGORY_SHEET_CSV_URL` で上書きでき、公開CSVのためSecretやAPIキーは不要。
 
-公開URLを受け取ったら、環境変数 `CATEGORY_SHEET_CSV_URL` に設定し、`dist/assets/config.js` の `categorySetsCsvUrl` を `/api/category-sets` にしてデプロイする。`functions/api/category-sets.js` は既存と同じ読み取り専用のGoogle CSV中継。設定なしは503を返す。
+通常の教材CSVとは別に取得・検証し、シートの条件変更を約60秒ごとに反映する。空のCSV・見出しだけのCSV・有効なセットが0件の定義は、演習に使える正常版として扱わない。最初の正常な定義をまだ取得できない場合は教材のタグから自動生成したセット、正常な定義を取得した後の失敗時はその定義を維持する。
 
-通常の教材CSVとは別に取得・検証し、以後はシートの条件変更を約60秒ごとに反映する。カテゴリの接続に失敗しても、演習画面へ技術的な通知を出さず、最後の正常な定義を維持する。
+カテゴリの取得結果は管理ページで確認する。演習画面へ技術的な通知は出さない。正常な定義を取得するとシートに記載されたセットだけを表示し、自動生成タグのセットへ勝手に広げない。
 
 ## 更新
 

@@ -11,7 +11,7 @@ export function readContentDiagnostics(storage) {
 }
 
 export function recordContentDiagnostics(storage, deckId, details) {
-  if (!['kanji', 'vocabulary'].includes(deckId) || !sources.has(details.source)) return false;
+  if (!['kanji', 'vocabulary', 'category_enshu'].includes(deckId) || !sources.has(details.source)) return false;
   try {
     const state = readContentDiagnostics(storage);
     const previous = state.decks[deckId];

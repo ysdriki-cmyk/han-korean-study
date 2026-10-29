@@ -3,6 +3,7 @@ import { parseDeck } from './decks.js';
 import { sheetHeader } from './sheet-fields.js';
 import { essentialKanji } from './kanji.js';
 import { examplesFromVocabulary } from './topik.js';
+import { parseCategorySheet, CATEGORY_SHEET_HEADERS } from './category-sheet.js';
 
 const common = [
   { names: ['韓国語','han','ハングル','korean','ko_word','moments いろいろhello talk'], use: '主な韓国語。쓰기の正解・읽기の問題・読み上げに使用。' },
@@ -31,6 +32,17 @@ const fields = {
     { names: ['topik1'], use: '空欄でない行を使用参考例に採用。#shopなどの分類名も保持。' },
   ],
 };
+const categoryUses = [
+  'セットの固定ID。同じIDの行を1セットの条件としてまとめる。半角英数字・_・-で1〜100文字。',
+  '学習画面に表示するセット名。1〜80文字。同じIDの続きの行では空欄を使用できる。',
+  '対象教材。one（한漢）またはword（単語）。同じIDの続きの行では空欄を使用できる。',
+  '条件を調べる教材の列名。oneは韓国語・出題ヒント・漢字候補・「解説・一覧」（または解説）・必須、wordは韓国語・カテゴリ・TOPIK1・日本語・英語。全件では空欄。',
+  '含む・含まない・タグ一致・等しい・印あり・空欄・空欄でない・全件を指定。印ありは必須列だけに使用。',
+  '比較する文字やタグ。印あり・空欄・空欄でない・全件では空欄。その他の条件では1〜500文字。',
+  '同じIDの条件をAND（すべて一致）またはOR（いずれか一致）でまとめる。最初の行で省略するとAND、続きの行では前の値を使う。',
+  'セットの並び順。小さい数から表示。最初の行で省略すると0、続きの行では前の値を使う。',
+];
+const categoryFields = new Map(CATEGORY_SHEET_HEADERS.map((header, index) => [header, categoryUses[index]]));
 
 export function columnLetter(index) {
   let name = '';
@@ -62,6 +74,37 @@ export function inspectContent(deckId, text) {
     categories: deckId === 'vocabulary' ? new Set(result.cards.flatMap(card => card.categories || [])).size : null,
     columns,
   };
+}
+
+/** Inspect sheet definitions without substituting automatic tags, cached content, or storage writes. */
+export function inspectCategoryContent(text) {
+  const result = parseCategorySheet(text);
+  let rows = [];
+  try {
+    if (typeof text === 'string' && text.length <= 2 * 1024 * 1024) rows = parseCSV(text);
+  } catch { /* The production parser already supplies the CSV error. */ }
+  const headers = rows[0] || [];
+  const width = rows.reduce((maximum, row) => Math.max(maximum, row.length), headers.length);
+  const columns = Array.from({ length: width }, (_, index) => {
+    const header = headers[index] || '';
+    const name = String(header).normalize('NFC').trim();
+    const sampleIndex = rows.findIndex((row, rowIndex) => rowIndex > 0 && String(row[index] || '').trim());
+    return {
+      cell: `${columnLetter(index)}1`, header: header || '（見出しなし）',
+      use: categoryFields.get(name) || 'この列は演習セットの定義に使用しません。見出しのない列に値を入力しないでください。',
+      sampleCell: sampleIndex > 0 ? `${columnLetter(index)}${sampleIndex + 1}` : '',
+      sample: sampleIndex > 0 ? String(rows[sampleIndex][index]).slice(0, 260) : '',
+    };
+  });
+  const count = result.sets.length;
+  const rawRows = rows.slice(1).filter(row => row.some(value => String(value).trim())).length;
+  // Match production: require one usable definition while retaining valid sets alongside row warnings.
+  const valid = count > 0;
+  const error = valid ? '' : !result.warnings.length ? 'セットの条件行がありません。'
+    : typeof text === 'string' && !text.trim()
+      ? 'category_enshuに入力がありません。8列の見出しとセットの条件を入力してください。'
+      : 'category_enshuに有効な演習セットがありません。見出しと条件の入力を確認してください。';
+  return { count, rawRows, warnings: result.warnings, columns, valid, error };
 }
 
 export function summarizeLearning(value) {

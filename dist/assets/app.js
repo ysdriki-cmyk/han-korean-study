@@ -2,7 +2,7 @@ import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from 
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
-import { recordContentDiagnostics } from './content-diagnostics.js';
+import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
 import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
@@ -486,11 +486,20 @@ async function loadCourse(id) {
 }
 function applyCategorySheet(text) {
   const result = parseCategorySheet(text);
-  if (!result.sets.length && result.warnings.length) throw new Error('有効な演習セットがありません。');
+  if (!result.sets.length) throw new Error(result.warnings.length ? '有効な演習セットがありません。' : '演習セットの条件行がまだありません。');
   const changed = !sheetSetsLoaded || text !== categorySheetText;
   sheetSets = result.sets; categorySheetText = text; sheetSetsLoaded = true;
   if (result.warnings.length) console.warn('[演習セット]', ...result.warnings);
   return changed;
+}
+function trackCategoryContent(source, error = null, fetchedAt = null) {
+  try {
+    recordContentDiagnostics(localStorage, 'category_enshu', {
+      source, cardCount: sheetSets.length, lastSuccessAt: fetchedAt,
+      httpStatus: error ? error.status : source === 'remote' ? 200 : null,
+      error: error instanceof Error ? error.message : '',
+    });
+  } catch { /* Set diagnostics never interrupt practice or change learning records. */ }
 }
 async function loadCategorySets() {
   const url = config.categorySetsCsvUrl;
@@ -500,18 +509,25 @@ async function loadCategorySets() {
     const target = new URL(url, location.href);
     if (target.protocol !== 'https:' && target.origin !== location.origin) throw new Error('セットの取得先を確認してください。');
     const response = await fetch(target, { signal: controller.signal, cache: 'no-store', credentials: target.origin === location.origin ? 'same-origin' : 'omit' });
-    if (!response.ok || /text\/html/i.test(response.headers.get('content-type') || '')) throw new Error('演習セットを取得できませんでした。');
+    if (!response.ok || /text\/html/i.test(response.headers.get('content-type') || '')) throw Object.assign(new Error('演習セットを取得できませんでした。'), { status: response.status });
     const text = await response.text();
     if (text.length > 3 * 1024 * 1024) throw new Error('演習セットのサイズを確認してください。');
     const changed = applyCategorySheet(text);
-    cacheContent('category_enshu', url, text, new Date().toISOString());
+    const fetchedAt = new Date().toISOString();
+    cacheContent('category_enshu', url, text, fetchedAt);
+    trackCategoryContent('remote', null, fetchedAt);
     return changed;
   } catch (error) {
     console.warn('[演習セット]', error instanceof Error ? error.message : '取得に失敗しました。');
     try {
       const snapshot = readContentSnapshot(localStorage, 'category_enshu', url);
-      if (snapshot) return applyCategorySheet(snapshot.text);
+      if (snapshot) {
+        const changed = applyCategorySheet(snapshot.text);
+        trackCategoryContent('cached', error, snapshot.fetchedAt);
+        return changed;
+      }
     } catch { /* Keep the previous valid set definitions. */ }
+    trackCategoryContent(sheetSetsLoaded ? 'cached' : 'unavailable', error);
     return false;
   } finally { clearTimeout(timer); }
 }
