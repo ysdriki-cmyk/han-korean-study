@@ -40,6 +40,14 @@ GET/HEADのみ。HTTPSのGoogle Sheets CSV URLだけを許可し、Googleの配�
 
 旧 `/api/cards` と `SHEET_CSV_URL` は1教材用の互換APIとして残す。新しい2シート連携では使わない。
 
+## 管理画面
+
+`/admin/` 以下に管理用画面を配置し、`dist/_redirects` で配下のURLを同じHTMLへ解決する。学習画面にリンクは置かない。教材の取得失敗・予備教材への切替は通常画面へ通知せず、`/admin/content/` で確認する。
+
+管理画面のAPI確認と通常画面の使用元を分け、スプシ・保存済み・同梱教材、確認日時、成功日時、件数を表示する。`/admin/schema/` は実際のCSVから列とセルを確認し、`/admin/storage/` と `/admin/guide/` は保存状態と更新手順を表示する。
+
+現状は管理者認証なし。URLを知る人は閲覧可能であり、noindexや導線を隠すことは認証の代わりにならない。Cloudflare Accessを使う場合は `/admin` と `/admin/*` を対象に、許可する管理者を限定する。秘密値や他の利用者の記録をこの画面へ返すAPIは設けていない。
+
 ## 学習記録
 
 記録は現在もブラウザ内の `han-hanja:learning:v3` に教材・方向別で保存する。教材更新は記録の同期ではない。ユーザー認証、端末間同期、旧ChatGPT Siteからの履歴移行は別途実装する。

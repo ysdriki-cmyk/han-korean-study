@@ -1,7 +1,8 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
-import { readContentCache, writeContentCache } from './content-cache.js';
+import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
+import { recordContentDiagnostics } from './content-diagnostics.js';
 import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
@@ -378,9 +379,9 @@ async function fetchText(url, deckId) {
     const target = new URL(url, location.href);
     if (target.protocol !== 'https:' && target.origin !== location.origin) throw new Error('取得先を確認してください。');
     const response = await fetch(target, { signal: controller.signal, cache: 'no-store', credentials: target.origin === location.origin ? 'same-origin' : 'omit' });
-    if (!response.ok) throw new Error('学習データを取得できませんでした。');
+    if (!response.ok) throw Object.assign(new Error('学習データを取得できませんでした。'), { status: response.status });
     const text = await response.text(); if (text.length > 3 * 1024 * 1024) throw new Error('学習データを読み込めませんでした。');
-    return { text, ...parseDeck(deckId, text) };
+    return { text, ...parseDeck(deckId, text), httpStatus: response.status };
   } finally { clearTimeout(timer); }
 }
 function restoreRecords() {
@@ -409,41 +410,68 @@ async function retryTopikExamples() {
 }
 async function loadCourse(id) {
   const source = courseConfig(id);
+  let remoteError = null;
   if (source.csvUrl) {
     try {
       const result = await fetchText(source.csvUrl, id);
-      cacheContent(id, source.csvUrl, result.text);
-      return { ...result, source: 'remote' };
+      const fetchedAt = new Date().toISOString();
+      cacheContent(id, source.csvUrl, result.text, fetchedAt);
+      trackContent(id, { ...result, source: 'remote', fetchedAt });
+      return { ...result, source: 'remote', fetchedAt };
     } catch (error) {
+      remoteError = error;
       console.warn('[教材取得]', id, error instanceof Error ? error.message : '取得に失敗しました。');
-      notice('教材の更新を確認できないため、保存済みの教材を表示しています。');
       try {
-        const text = readContentCache(localStorage, id, source.csvUrl);
-        if (text) return { text, ...parseDeck(id, text), source: 'cached' };
+        const snapshot = readContentSnapshot(localStorage, id, source.csvUrl);
+        if (snapshot) {
+          const result = { ...snapshot, ...parseDeck(id, snapshot.text), source: 'cached' };
+          trackContent(id, result, error);
+          return result;
+        }
       } catch { /* Fall back to the bundled deck if storage is unavailable or invalid. */ }
     }
   }
-  return { ...await fetchText(source.fallbackCsvUrl, id), source: 'bundled' };
+  try {
+    const result = { ...await fetchText(source.fallbackCsvUrl, id), source: 'bundled' };
+    trackContent(id, result, remoteError);
+    return result;
+  } catch (error) {
+    trackContent(id, { source: 'unavailable' }, remoteError || error);
+    throw error;
+  }
 }
-function cacheContent(id, url, text) {
-  try { writeContentCache(localStorage, id, url, text); } catch { /* Keep learning usable without storage. */ }
+function trackContent(id, result, error = null) {
+  try {
+    recordContentDiagnostics(localStorage, id, {
+      source: result.source, cardCount: result.cards?.length, warningCount: result.warnings?.length,
+      lastSuccessAt: result.fetchedAt, httpStatus: error ? error.status : result.source === 'remote' ? result.httpStatus : null,
+      error: error instanceof Error ? error.message : '',
+    });
+  } catch { /* Diagnostics must never interrupt practice or alter learning records. */ }
+}
+function cacheContent(id, url, text, fetchedAt) {
+  try { writeContentCache(localStorage, id, url, text, fetchedAt); } catch { /* Keep learning usable without storage. */ }
 }
 async function refreshRemote() {
   if (polling || document.visibilityState !== 'visible') return; polling = true;
   try {
     const remoteDecks = DECKS.filter(deck => courseConfig(deck.id).csvUrl);
     const results = await Promise.allSettled(remoteDecks.map(deck => fetchText(courseConfig(deck.id).csvUrl, deck.id)));
-    let failed = false, changed = false, referencesChanged = false;
+    let changed = false, referencesChanged = false;
     results.forEach((response, index) => {
       if (response.status === 'rejected') {
-        failed = true;
+        const previous = deckData.get(remoteDecks[index].id);
+        trackContent(remoteDecks[index].id, { ...previous, source: previous ? previous.source === 'bundled' ? 'bundled' : 'cached' : 'unavailable' }, response.reason);
         console.warn('[教材更新]', remoteDecks[index].id, response.reason instanceof Error ? response.reason.message : '取得に失敗しました。');
         return;
       }
-      const deck = remoteDecks[index], result = { ...response.value, source: 'remote' };
-      cacheContent(deck.id, courseConfig(deck.id).csvUrl, result.text);
-      if (result.text !== deckData.get(deck.id)?.text) {
-        deckData.set(deck.id, result); changed = true;
+      const deck = remoteDecks[index], result = { ...response.value, source: 'remote', fetchedAt: new Date().toISOString() };
+      cacheContent(deck.id, courseConfig(deck.id).csvUrl, result.text, result.fetchedAt);
+      trackContent(deck.id, result);
+      const contentChanged = result.text !== deckData.get(deck.id)?.text;
+      deckData.set(deck.id, result);
+      if (contentChanged) {
+        changed = true;
         if (deck.id === activeDeck) cards = result.cards;
         if (deck.id === 'vocabulary' && config.referencesFromVocabulary) {
           topikExamples = examplesFromVocabulary(result.cards); topikState = 'ready'; referencesChanged = true;
@@ -453,10 +481,8 @@ async function refreshRemote() {
     if (changed) {
       updateCourseChrome(); renderOverview(); renderLibrary();
       if (revealed && referencesChanged) renderCard();
-      toast('教材を更新しました。今のセットは続けられます。');
     }
-    notice(failed ? '教材の更新を確認できませんでした。今の教材で演習を続けられます。' : '');
-  } catch { notice('教材の更新を確認できませんでした。今の教材で演習を続けられます。'); }
+  } catch (error) { console.warn('[教材更新]', error instanceof Error ? error.message : '更新を確認できませんでした。'); }
   finally { polling = false; }
 }
 function openSettings() { speaker.stop(); syncSettingsForm(); renderSettings(); $('#practice-settings').showModal(); }
