@@ -5,6 +5,7 @@ window.APP_CONFIG = {
     kanji: {csvUrl: '/api/content/kanji', fallbackCsvUrl: './data/cards.csv'}
   },
   referencesFromVocabulary: true,
+  categorySetsCsvUrl: '',
   refreshIntervalMs: 60000,
   fetchTimeoutMs: 20000
 };

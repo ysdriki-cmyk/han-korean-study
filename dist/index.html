@@ -14,14 +14,15 @@
   <link rel="stylesheet" href="./assets/topik.css?v=6">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
   <link rel="stylesheet" href="./assets/navigation.css?v=1">
+  <link rel="stylesheet" href="./assets/study-home.css?v=1">
   <script src="./assets/config.js?v=2" defer></script>
-  <script type="module" src="./assets/app.js?v=26"></script>
+  <script type="module" src="./assets/app.js?v=27"></script>
 </head>
-<body>
+<body data-view="home">
 <a class="skip-link" href="#main">演習へ移動</a>
 <header class="app-header">
   <div class="header-identity">
-    <a class="brand" href="#study" aria-label="한と漢 演習"><span class="brand-mark">한</span><strong>한と漢</strong></a>
+    <a class="brand" href="#home" aria-label="한と漢 ホーム"><span class="brand-mark">한</span><strong>한と漢</strong></a>
     <div class="course-tabs" role="group" aria-label="教材">
       <button type="button" data-deck="kanji" aria-pressed="true">한漢<span id="deck-kanji-count">650</span></button>
       <button type="button" data-deck="vocabulary" aria-pressed="false">単語<span id="deck-vocabulary-count" hidden>4,559</span></button>
@@ -31,8 +32,10 @@
 </header>
 <main id="main" tabindex="-1">
   <div id="notice" class="notice" role="status" hidden></div>
-  <section id="study-view" class="view">
+  <section id="home-view" class="view study-home"><h1>学習セット</h1><p class="loading-state">読み込み中…</p></section>
+  <section id="study-view" class="view" hidden>
     <h1 class="sr-only">演習</h1>
+    <div class="study-set-context"><button type="button" data-view="home">← セット一覧</button><span id="active-set-label"></span></div>
     <div class="practice-stage">
       <div class="session-bar" aria-label="演習の進捗">
         <span class="session-count"><span class="session-label">進捗</span><strong id="session-done">0</strong><span class="session-divider">/</span><span id="session-total">10</span></span>
@@ -43,7 +46,7 @@
       <article id="flashcard" class="flashcard" aria-label="演習カード" aria-busy="true"><div class="loading-state">読み込み中…</div></article>
     </div>
   </section>
-  <div class="workspace-controls" role="group" aria-label="演習メニュー">
+  <div class="workspace-controls" role="group" aria-label="演習メニュー" hidden>
     <div class="mode-toolbar">
       <div class="mode-switch" role="group" aria-label="演習モード">
         <button data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>
@@ -58,13 +61,14 @@
       </div>
     </div>
     <nav class="main-nav" aria-label="メインメニュー">
+      <button class="nav-item" data-view="home"><span data-icon="layers"></span>セット</button>
       <button class="nav-item active" data-view="study"><span data-icon="cards"></span>演習</button>
       <button class="nav-item" data-view="library"><span data-icon="grid"></span>一覧<span id="nav-count" class="nav-count"></span></button>
       <button class="nav-item" data-view="progress"><span data-icon="chart"></span>記録</button>
     </nav>
   </div>
   <section id="library-view" class="view" hidden>
-    <div class="page-heading"><h1>カード一覧</h1><span><strong id="library-total">—</strong>枚</span></div>
+    <div class="page-heading"><h1 id="library-title">カード一覧</h1><span><strong id="library-total">—</strong>枚</span></div>
     <div id="rank-filters" class="status-filters" aria-label="評価で絞り込み"></div>
     <div class="library-toolbar">
       <label class="search-field"><span data-icon="search"></span><input id="library-search" type="search" aria-label="カードを検索" placeholder="検索" autocomplete="off"></label>

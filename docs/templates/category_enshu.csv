@@ -1,0 +1,12 @@
+category_id,カテゴリ名,教材,対象列,条件,値,条件の結合,表示順
+all_kanji,すべての한漢,one,,全件,,AND,0
+required,必須漢字,one,必須,印あり,,AND,10
+quoted_hint,引用記号を含むヒント,one,出題ヒント,含む,『,OR,20
+quoted_hint,引用記号を含むヒント,one,出題ヒント,含む,』,OR,20
+travel,旅行,word,TOPIK1,タグ一致,#travel,AND,30
+verbs,必須動詞,word,カテゴリ,タグ一致,#必須動詞,AND,40
+travel_verbs,旅行の必須動詞,word,カテゴリ,タグ一致,#必須動詞,AND,45
+travel_verbs,旅行の必須動詞,word,TOPIK1,タグ一致,#travel,AND,45
+conjunctions,接続詞,word,カテゴリ,タグ一致,接続詞,AND,50
+topik1,TOPIK1,word,TOPIK1,空欄でない,,AND,60
+uncategorized,カテゴリ未分類,word,カテゴリ,空欄,,AND,70

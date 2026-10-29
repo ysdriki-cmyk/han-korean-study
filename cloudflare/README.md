@@ -24,6 +24,14 @@
 
 アプリの接続先は `dist/assets/config.js` の教材別 `csvUrl`。TOPIK1は別CSVではなく単語CSVの空欄でないTOPIK1列から生成する。列の仕様は[教材シートの形式](../docs/content-schema.md)を参照。
 
+## 演習セット用の追加シート
+
+`category_enshu` の入力形式は[カテゴリ設定](../docs/category-sets.md)と[サンプルCSV](../docs/templates/category_enshu.csv)を参照する。現在は公開URLが未共有のため未接続で、ホームは基本セットと既存教材のタグを表示する。
+
+公開URLを受け取ったら、環境変数 `CATEGORY_SHEET_CSV_URL` に設定し、`dist/assets/config.js` の `categorySetsCsvUrl` を `/api/category-sets` にしてデプロイする。`functions/api/category-sets.js` は既存と同じ読み取り専用のGoogle CSV中継。設定なしは503を返す。
+
+通常の教材CSVとは別に取得・検証し、以後はシートの条件変更を約60秒ごとに反映する。カテゴリの接続に失敗しても、演習画面へ技術的な通知を出さず、最後の正常な定義を維持する。
+
 ## 更新
 
 - 表示中のタブで約60秒ごと、タブに戻ったときにも最新CSVを確認する。
