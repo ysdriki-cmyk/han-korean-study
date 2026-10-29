@@ -41,6 +41,23 @@ export function parseTopikExamples(text) {
   return { examples, warnings };
 }
 
+/** The live word sheet is also the reference source; an empty marker excludes a row. */
+export function examplesFromVocabulary(cards) {
+  const examples = [], seen = new Set();
+  for (const card of cards) {
+    if (!card.topik) continue;
+    const entry = {
+      korean: clean(card.han), english: clean(card.english ?? card.meaning),
+      japanese: clean(card.kanji), exampleKo: clean(card.exampleKo), exampleJa: clean(card.exampleJp),
+    };
+    const identity = JSON.stringify(fields.map(field => entry[field]));
+    if (!HANGUL.test(entry.korean) || (!entry.english && !entry.japanese) || seen.has(identity)) continue;
+    seen.add(identity);
+    examples.push({ id: `topik:${card.id}`, ...entry });
+  }
+  return examples;
+}
+
 /** Literal E-column search: exact words first, then source-ordered character hits. */
 export function findTopikExamples(examples, query) {
   const terms = [...new Set((Array.isArray(query) ? query : [query])

@@ -1,4 +1,5 @@
 /** Pure data helpers shared by the app and Node tests. No browser state here. */
+import { sheetHeader, sheetFlag } from './sheet-fields.js';
 
 /** Parse RFC 4180 style CSV, including a UTF-8 BOM and quoted line breaks. */
 export function parseCSV(text) {
@@ -66,16 +67,17 @@ export function normalizeCards(text) {
   const warnings = [];
   const cards = [];
   if (!rows.length) return { cards, warnings: ['CSVにデータがありません。'] };
-  const headers = rows[0].map((value) => clean(value).toLowerCase());
+  const headers = rows[0].map(sheetHeader);
   const findColumn = (...names) => headers.findIndex((header) => names.includes(header));
   const column = {
-    id: findColumn('id', 'no.', 'no', '番号'),
+    id: findColumn('id', 'id_one', 'id_kan', 'no.', 'no', '番号'),
     han: findColumn('han', 'ハングル', '韓国語', 'ko_word'),
-    kanji: findColumn('漢字', 'kanji'),
-    hanja: findColumn('一覧', 'hanja'),
-    meaning: findColumn('意味', 'meaning', 'notes', 'メモ'),
+    kanji: findColumn('出題ヒント', '漢字', 'kanji'),
+    hanja: findColumn('漢字候補', '一覧', 'hanja'),
+    meaning: findColumn('解説', '解説・一覧', '解説/一覧', '解説一覧', '意味', 'meaning', 'notes', 'メモ'),
     state: findColumn('state', '状態'),
     flagged: findColumn('flagged', 'flag', '重点'),
+    essential: findColumn('必須', 'essential'),
   };
   const legacy = headers.length === 10 && column.han === 4 && column.kanji === 5 && column.hanja === 8;
   if (legacy && column.meaning < 0) column.meaning = 9;
@@ -100,6 +102,7 @@ export function normalizeCards(text) {
       state: value('state'),
       flagged: ['！', '!', 'true', '1', 'yes', '重点'].includes(flag.toLowerCase()),
     };
+    if (column.essential >= 0) card.essential = sheetFlag(value('essential'));
     if (!card.id) {
       // Metadata may be edited without changing the identity of a study item.
       const fields = [card.han, card.kanji, card.hanja, card.meaning];

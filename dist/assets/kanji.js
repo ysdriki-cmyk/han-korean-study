@@ -1,5 +1,6 @@
 /** The supplied sheet's F column is normalized as card.kanji. */
 export function essentialKanji(card) {
+  if (typeof card?.essential === 'boolean') return card.essential;
   return Boolean(String(card?.kanji ?? '').trim());
 }
 

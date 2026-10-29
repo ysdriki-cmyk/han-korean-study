@@ -1,6 +1,7 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js';
 import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
-import { parseTopikExamples } from './topik.js';
+import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
+import { readContentCache, writeContentCache } from './content-cache.js';
 import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
@@ -26,6 +27,7 @@ const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'study', activeDeck = 'kanji';
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
+let sessionCards = [];
 let cardViews = new Map(), advancedPositions = new Set();
 let answers = new Map(), hintSeeds = new Map(), initialCount = 0, sessionScope = 'essential';
 let rankFilter = 'all', page = 0, selected = new Set(), revealedRows = new Set(), pageCards = [];
@@ -162,6 +164,7 @@ function speakQuestion() {
 }
 function startSession(custom = null, { all = false, autoplay = false } = {}) {
   composing = false; compositionEndedAt = 0;
+  sessionCards = cards;
   const eligible = (custom ?? pool()).filter(card => settings.sessionType === 'review' || !mistakeCoolingDown(card, records, settings.mode));
   session = makePracticeSession(eligible, records, { ...settings, limit: all ? 'all' : settings.limit });
   initialCount = session.length; sessionScope = settings.scope;
@@ -191,8 +194,12 @@ function answerRows(card) {
   const examples = activeDeck === 'vocabulary' && (card.exampleKo || card.exampleJp)
     ? `<details class="example-block"><summary>例文</summary>${card.exampleKo ? `<p lang="ko">${esc(card.exampleKo)}${speechButton(card.exampleKo)}</p>` : ''}${card.exampleJp ? `<p lang="ja">${esc(card.exampleJp)}</p>` : ''}</details>` : '';
   const otherHints = activeDeck === 'kanji' && settings.mode === 'write' ? answerFields(card, activeDeck).map(field => `<div class="answer-row"><span class="answer-label">${esc(field.label)}</span><p class="answer-value" lang="ja">${esc(field.text)}</p></div>`).join('') : '';
-  const alternatives = activeDeck === 'kanji' && settings.mode === 'write' ? kanjiAnswersForPrompt(cards, currentKanjiHint(card)).filter(answer => answer !== card.han) : [];
-  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + examples;
+  const alternatives = activeDeck === 'kanji' && settings.mode === 'write' ? kanjiAnswersForPrompt(sessionCards, currentKanjiHint(card)).filter(answer => answer !== card.han) : [];
+  const wordNotes = activeDeck === 'vocabulary'
+    ? [{label:'正解表記',text:card.answerVariants?.join('\n'),lang:'ko'}, {label:'類語',text:card.synonyms,lang:'ko'}, {label:'解説',text:card.notes,lang:'ja'}]
+      .filter(field => field.text).map(field => `<div class="answer-row"><span class="answer-label">${field.label}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('')
+    : '';
+  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + examples;
 }
 function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);
@@ -295,7 +302,7 @@ function rateCard(rating) {
 function checkWriting() {
   const card = session[position]; if (!card || revealed || composing || settings.mode !== 'write') return;
   submitted = $('#hangul-input')?.value.trim() || '';
-  const correct = submitted ? (activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : kanjiAnswersForPrompt(cards, currentKanjiHint(card)).some(answer => matchHangul(submitted, answer))) : null;
+  const correct = submitted ? (activeDeck === 'vocabulary' ? matchVocabularyAnswer(submitted, card) : kanjiAnswersForPrompt(sessionCards, currentKanjiHint(card)).some(answer => matchHangul(submitted, answer))) : null;
   const rating = writingAssessment(rank(card), correct);
   records[card.id] = applyReviewSchedule(recordAssessment(record(card), 'write', rating, { correct }), 'write', rating);
   answers.set(position, { cardId: card.id, passed: correct === true, correct, rating });
@@ -380,6 +387,8 @@ function restoreRecords() {
   records = restoreLearningRecords(readJSON(RECORD_KEY, null), readJSON('han-hanja:learning:v2', null), readJSON('han-hanja:progress:v1', {})); saveRecords();
 }
 async function loadTopikExamples() {
+  const vocabulary = deckData.get('vocabulary');
+  if (config.referencesFromVocabulary && vocabulary?.source && vocabulary.source !== 'bundled') return examplesFromVocabulary(vocabulary.cards);
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), config.fetchTimeoutMs || 10000);
   try {
     const response = await fetch('./data/topik1.csv', { signal: controller.signal, cache: 'no-store', credentials: 'same-origin' });
@@ -400,21 +409,53 @@ async function retryTopikExamples() {
 }
 async function loadCourse(id) {
   const source = courseConfig(id);
-  if (source.csvUrl) { try { return await fetchText(source.csvUrl, id); } catch { notice('更新データを取得できないため、保存済みの教材を表示しています。'); } }
-  return fetchText(source.fallbackCsvUrl, id);
+  if (source.csvUrl) {
+    try {
+      const result = await fetchText(source.csvUrl, id);
+      cacheContent(id, source.csvUrl, result.text);
+      return { ...result, source: 'remote' };
+    } catch (error) {
+      console.warn('[教材取得]', id, error instanceof Error ? error.message : '取得に失敗しました。');
+      notice('教材の更新を確認できないため、保存済みの教材を表示しています。');
+      try {
+        const text = readContentCache(localStorage, id, source.csvUrl);
+        if (text) return { text, ...parseDeck(id, text), source: 'cached' };
+      } catch { /* Fall back to the bundled deck if storage is unavailable or invalid. */ }
+    }
+  }
+  return { ...await fetchText(source.fallbackCsvUrl, id), source: 'bundled' };
+}
+function cacheContent(id, url, text) {
+  try { writeContentCache(localStorage, id, url, text); } catch { /* Keep learning usable without storage. */ }
 }
 async function refreshRemote() {
   if (polling || document.visibilityState !== 'visible') return; polling = true;
   try {
-    for (const deck of DECKS) {
-      const source = courseConfig(deck.id); if (!source.csvUrl) continue;
-      const result = await fetchText(source.csvUrl, deck.id);
-      if (result.text !== deckData.get(deck.id)?.text) {
-        deckData.set(deck.id, result); updateCourseChrome();
-        if (deck.id === activeDeck) { cards = result.cards; renderOverview(); renderLibrary(); toast('教材を更新しました。今のセットは続けられます。'); }
+    const remoteDecks = DECKS.filter(deck => courseConfig(deck.id).csvUrl);
+    const results = await Promise.allSettled(remoteDecks.map(deck => fetchText(courseConfig(deck.id).csvUrl, deck.id)));
+    let failed = false, changed = false, referencesChanged = false;
+    results.forEach((response, index) => {
+      if (response.status === 'rejected') {
+        failed = true;
+        console.warn('[教材更新]', remoteDecks[index].id, response.reason instanceof Error ? response.reason.message : '取得に失敗しました。');
+        return;
       }
+      const deck = remoteDecks[index], result = { ...response.value, source: 'remote' };
+      cacheContent(deck.id, courseConfig(deck.id).csvUrl, result.text);
+      if (result.text !== deckData.get(deck.id)?.text) {
+        deckData.set(deck.id, result); changed = true;
+        if (deck.id === activeDeck) cards = result.cards;
+        if (deck.id === 'vocabulary' && config.referencesFromVocabulary) {
+          topikExamples = examplesFromVocabulary(result.cards); topikState = 'ready'; referencesChanged = true;
+        }
+      }
+    });
+    if (changed) {
+      updateCourseChrome(); renderOverview(); renderLibrary();
+      if (revealed && referencesChanged) renderCard();
+      toast('教材を更新しました。今のセットは続けられます。');
     }
-    notice('');
+    notice(failed ? '教材の更新を確認できませんでした。今の教材で演習を続けられます。' : '');
   } catch { notice('教材の更新を確認できませんでした。今の教材で演習を続けられます。'); }
   finally { polling = false; }
 }
@@ -515,7 +556,7 @@ function bind() {
   $('#queue-selected').onclick = () => practiceSelected(new Set(selected));
   $('#prev-page').onclick = () => { page -= 1; renderLibrary(); }; $('#next-page').onclick = () => { page += 1; renderLibrary(); };
   window.addEventListener('pagehide', () => speaker.stop());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) speaker.stop(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) speaker.stop(); else if (loaded) refreshRemote(); });
   window.addEventListener('hashchange', () => setView(location.hash.slice(1), { hash: false }));
   document.addEventListener('keydown', event => {
     if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open) return;
@@ -529,12 +570,12 @@ async function init() {
   preferences = restorePracticePreferences(readJSON(PREF_KEY, null), readJSON('han-hanja:preferences:v3', null));
   activeDeck = getDeck(preferences.deckId || config.defaultDeck).id; settings = practiceSettings(preferences.courses[activeDeck]);
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
-  // Reference examples load independently so a failed reference never blocks practice.
+  const results = await Promise.allSettled(DECKS.map(deck => loadCourse(deck.id)));
+  results.forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(DECKS[index].id, result.value); });
+  // A live word snapshot supplies its own references; bundled decks retain the legacy fallback.
   loadTopikExamples().then(examples => { topikExamples = examples; topikState = 'ready'; })
     .catch(() => { topikState = 'error'; })
     .finally(() => { if (loaded && revealed) renderCard(); });
-  const results = await Promise.allSettled(DECKS.map(deck => loadCourse(deck.id)));
-  results.forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(DECKS[index].id, result.value); });
   if (!deckData.has(activeDeck) && deckData.size) {
     activeDeck = deckData.keys().next().value; settings = practiceSettings(preferences.courses[activeDeck]);
     notice('選んだ教材を開けなかったため、別の教材を表示しています。', true);

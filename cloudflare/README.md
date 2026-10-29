@@ -1,59 +1,47 @@
-# 管理者向け: Cloudflare Pagesで教材を連携する
+# Cloudflare Pagesでの公開CSV連携
 
-GitHubからの移行、新しい教材形式、ログイン・履歴の引き継ぎは[移行手順](MIGRATION.md)を参照してください。以下は現在の1教材用CSV中継APIの設定です。
+現在の公開先：`https://han-korean-study.pages.dev/`。GitHub `ysdriki-cmyk/han-korean-study` のmainから自動デプロイする。
 
-利用者は「한漢」と「単語」の教材を切り替え、쓰기・읽기で学習します。出題ルールは[開発README](../README.md)を参照してください。教材CSV、Google Sheetsの接続先、更新間隔は管理者が配信時に設定し、利用者の画面にファイル入出力や接続設定を設けません。
-
-## Pagesへ配置する
-
-| 設定 | 値 |
+| 項目 | 値 |
 | --- | --- |
-| ルートディレクトリ | この `han-korean-study` フォルダ |
-| フレームワーク | なし |
-| ビルドコマンド | `exit 0` |
-| 出力ディレクトリ | `dist` |
+| Framework | None |
+| Root directory | リポジトリのルート（空欄） |
+| Build command | `exit 0` |
+| Build output directory | `dist` |
 
-`functions/` は `dist/` の外、プロジェクトのルートに置きます。`functions/api/cards.js` が `/api/cards` に対応します。[Cloudflare公式: Functionsの作成](https://developers.cloudflare.com/pages/functions/get-started/)、[ルーティング](https://developers.cloudflare.com/pages/functions/routing/)
+`functions/` は `dist/` の外、リポジトリのルートに置く。公開先に `/dist/index.html` だけが存在し `/` が404なら、出力ディレクトリがリポジトリ全体になっていないか確認し、`dist` へ修正して再デプロイする。
 
-アプリ本体だけなら静的配信で動きます。以下のFunctionは、Google Sheetsを同じオリジンから取得したい場合だけ使う任意の追加機能です。静的サイトを配信しただけではFunctionは起動しません。
+## 設定済みの教材
 
-## 教材接続を設定する
+`functions/api/content/[deck].js` が公開Google CSVを読み取り、同じオリジンから返す。接続先は利用者が共有した公開済みCSVで、APIキーや追加のGoogleログインは不要。
 
-1. Google Sheetsの教材タブをCSV形式で公開します。
-2. Pagesの環境変数 **`SHEET_CSV_URL`** に公開URLを設定します。ProductionとPreviewはそれぞれ設定してください。
-3. `dist/assets/config.js` で、漢字教材なら `window.APP_CONFIG.decks.kanji.csvUrl`、単語教材なら `window.APP_CONFIG.decks.vocabulary.csvUrl` を `/api/cards` に設定します。
-4. 再デプロイします。以後はアプリが設定された教材を読み込みます。
+| API | Google Sheetsのgid | 上書き用環境変数（任意） |
+| --- | --- | --- |
+| `/api/content/kanji` | `29317581` | `KANJI_SHEET_CSV_URL` |
+| `/api/content/vocabulary` | `0` | `VOCABULARY_SHEET_CSV_URL` |
 
-```text
-https://docs.google.com/spreadsheets/d/e/公開ID/pub?gid=0&single=true&output=csv
-```
+現在の公開URLはルート内に設定済み。環境変数がなければそのURLを使う。別のSheetへ変更する場合は環境変数または固定URLを更新し、再デプロイする。環境変数はProductionとPreviewで必要に応じて分ける。
 
-`https://docs.google.com/spreadsheets/d/シートID/export?format=csv&gid=0` 形式も受け付けます。認証を必要としない教材用のシートを指定してください。管理者が公開CSVへ直接接続する構成にする場合は、対象教材の接続先にそのURLを設定し、Functionを省略できます。
+アプリの接続先は `dist/assets/config.js` の教材別 `csvUrl`。TOPIK1は別CSVではなく単語CSVの空欄でないTOPIK1列から生成する。列の仕様は[教材シートの形式](../docs/content-schema.md)を参照。
 
-同梱教材は漢字650枚・単語4,559枚です。2教材の接続先は別々に管理します。現在の `/api/cards` は環境変数一つで指定した一つのCSVを返すAPIです。両教材を別々のSheetsから中継する場合は、管理者が教材ごとの固定ルートと環境変数を追加してください。利用者のURL引数で任意の取得先を指定する構成にはしません。
+## 更新
 
-初期表示は `defaultDeck: 'kanji'`、同梱教材は `decks.vocabulary.fallbackCsvUrl: './data/vocabulary.csv'` と `decks.kanji.fallbackCsvUrl: './data/cards.csv'` です。旧形式のトップ階層 `csvUrl` は漢字教材用の互換設定に限り、新しく設定する場合は `decks` の教材別URLを使います。
-
-更新間隔は `config.js` の `refreshIntervalMs`、ブラウザの取得時間の上限は `fetchTimeoutMs` で管理します。利用者による接続操作は不要です。Googleの公開版への更新には数分かかる場合があるため、定期取得でも即時反映は保証できません。[Google公式の更新について](https://support.google.com/docs/answer/183965?hl=ja)
-
-通常の `npm run dev` は静的サーバーです。ローカルでFunctionも確認する場合は、Wranglerのある環境でプロジェクトルートから `npx wrangler pages dev dist` を実行し、ローカル用の `SHEET_CSV_URL` を設定します。ローカルの環境変数ファイルはGitに含めません。
+- 表示中のタブで約60秒ごと、タブに戻ったときにも最新CSVを確認する。
+- Googleの公開版への更新には数分かかる場合がある。編集ごとのGitHubコミットや再デプロイは不要。
+- 初回表示は最新CSVを優先。失敗時は最後に正常取得した同じURLのCSV、なければ同梱教材を使う。
+- 読込失敗・不正なCSV・ID重複では今の教材を保持し、学習記録を削除しない。
+- セット中の問題や採点用の対応表を途中で差し替えない。次のセットから新しい教材を使う。
 
 ## 読み取りAPIの範囲
 
-- `GET /api/cards` と `HEAD /api/cards` のみ。教材の変更や学習記録の送信は行いません。
-- 取得先はサーバー側の `SHEET_CSV_URL` だけです。リクエストのURL引数による任意サイトの中継はしません。
-- HTTPSのGoogle Sheets CSV URLを検証し、Googleの配信用ホスト以外へのリダイレクトを拒否します。
-- 上流の取得は12秒で打ち切り、CSVは3 MiBまで受け付けます。HTMLのログイン画面はエラーにします。
-- 応答に `Cache-Control: no-store` を付けます。Google側の公開更新の遅れは除けません。
+GET/HEADのみ。HTTPSのGoogle Sheets CSV URLだけを許可し、Googleの配信用ホスト以外へのリダイレクトを拒否する。取得は12秒、サイズは3 MiBまで。HTMLやログイン画面は拒否し、応答はCache-Control: no-store。
 
-未設定なら503、取得失敗・タイムアウトなら502、書き込み要求なら405です。環境変数の値や内部エラー本文は応答に含めません。
+取得先を利用者のURL引数で指定する中継APIにはしない。未設定・設定不備は503、取得失敗は502、書き込み要求は405。内部エラーや秘密値を応答に含めない。
 
-## 学習記録と将来の同期
+旧 `/api/cards` と `SHEET_CSV_URL` は1教材用の互換APIとして残す。新しい2シート連携では使わない。
 
-現在の連携は **Sheets → アプリ** の教材読み取りです。評価と学習記録は教材・学習方向ごとに分けて各ブラウザに保存され、スプレッドシートには書き戻しません。利用者のファイル操作をなくしても、端末間の同期が追加されるわけではありません。
+## 学習記録
 
-保存キー `han-hanja:learning:v3` のカードIDは `kanji:<No>` と `vocabulary:<No>` を使います。教材を追加・更新するときは、これらのIDを変更・再利用しません。
+記録は現在もブラウザ内の `han-hanja:learning:v3` に教材・方向別で保存する。教材更新は記録の同期ではない。ユーザー認証、端末間同期、旧ChatGPT Siteからの履歴移行は別途実装する。
 
-端末間で共有する段階では、利用者認証と、教材ID・カードIDをキーにした学習記録テーブルを追加します。スプレッドシートへの書き戻しには、サーバー側のGoogle Sheets API認証、更新権限、競合解決も必要です。サービスアカウント鍵やAPIトークンは `dist/` や公開JavaScriptに置きません。
-
-このコードを追加しただけでは、利用者のCloudflareアカウントやGoogle Sheetsには接続されません。管理者による実際のURL・環境変数の設定と配信が必要です。
+参考：[Cloudflareの静的HTML設定](https://developers.cloudflare.com/pages/framework-guides/deploy-anything/)、[Pages Functions](https://developers.cloudflare.com/pages/functions/get-started/)、[Google公開版の更新](https://support.google.com/docs/answer/183965?hl=ja)。

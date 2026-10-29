@@ -1,6 +1,6 @@
 # GitHub・Cloudflareへの移行
 
-2026-10-29更新。現在の本番はChatGPT Sites。独自GitHub・Cloudflareへの接続・デプロイは未実施。
+2026-10-29更新。GitHub `ysdriki-cmyk/han-korean-study` の `main` とCloudflare Pagesを接続済み。本番は https://han-korean-study.pages.dev/ 。以下の初回接続手順は、新環境を作る場合の記録として残す。
 
 ## 構成と順序
 
@@ -20,7 +20,7 @@ Sites用Git接続がある場合は上書きせずGitHubを別リモートにす
 
 ### 初回の具体的な接続
 
-確認時点でローカルGitは初期化済み、ブランチは `main`、リモートは未登録。`git init` は不要。対象は `/Users/yoi/Public/韓→漢/han-korean-study` で、HTMLがある `dist/` だけをGit管理のルートにはしない。
+現在はローカルGitのブランチ `main` とリモート `origin` を接続済み。以下は初回接続の手順。`git init` は不要。対象は `/Users/yoi/Public/韓→漢/han-korean-study` で、HTMLがある `dist/` だけをGit管理のルートにはしない。
 
 1. GitHubの [New repository](https://github.com/new) を開く。現在コネクターで確認できる個人アカウントは `ysdriki-cmyk`。
 2. 名前は `han-korean-study`、公開範囲はPrivateを候補にする。README・gitignore・ライセンスを自動生成せず、空のリポジトリを作る。
@@ -61,19 +61,14 @@ Workers & Pages → Create application → Pages → Import an existing Git repo
 
 ## 3. 教材連携
 
-### 現状
+### 現在の実装
 
-- `/api/cards` は1つの公開Google CSVを返す。サーバー環境変数は `SHEET_CSV_URL`。非公開Sheetの認証には未対応。
-- `assets/config.js` の `decks.kanji.csvUrl` または `decks.vocabulary.csvUrl` に `/api/cards` を設定すると、どちらか一方を接続できる。両方に設定しても同じCSVを読むため、2教材の接続にはならない。
-- TOPIK1は同梱 `./data/topik1.csv` のみ。外部URL設定は未実装。
-- 設定時は約60秒ごとに更新確認する。失敗時は同梱教材を使い、演習中のセットは差し替えない。
-
-### 実装する内容
-
-1. 2シートを固定ルートに分ける。設計例は `/api/content/kanji`、`/api/content/vocabulary`。これらはまだ存在しない。TOPIK1は単語シートのチェック列へ統合するため、別の取得先は設けない。
-2. [新しい列名](../docs/content-schema.md)で解析する。IDの互換、明示的な別解、必須・有効フラグを検証する。
-3. ID重複・必須列欠落・予期しない大量欠落を確認し、正常な版だけを配信する。不備・通信失敗時は直前の正常な教材を保持する。この永続的な正常版保持は未実装。
-4. 単語シートの `TOPIK1=TRUE` かつ `有効=TRUE` の行から参考例を生成し、問題・解答・参考例の版をそろえる。演習中のセットは途中で変更しない。
+- `/api/content/kanji` と `/api/content/vocabulary` が、それぞれ公開済みGoogle CSVを返す。接続URLは `functions/api/content/[deck].js` に設定済みで、APIキーは不要。
+- 任意の環境変数 `KANJI_SHEET_CSV_URL`／`VOCABULARY_SHEET_CSV_URL` で差し替えられる。従来の `/api/cards` と `SHEET_CSV_URL` も互換用に残す。
+- [列名とIDの別名](../docs/content-schema.md)に対応。`有効`列は使わず、韓国語と出題内容・訳がある行を採用する。
+- 単語の空欄でない `TOPIK1` 列から参考例を生成し、分類名を将来のテーマ学習用にも保持する。参考例用の3枚目のSheetは不要。
+- 約60秒ごと・タブに戻ったときに更新する。ID重複・空の教材・取得失敗時は更新しない。最後に正常に読めた教材をブラウザに保存し、取得できなければその版、なければ同梱教材を使う。途中のセットの問題・採点候補は差し替えない。
+- 同梱CSVは予備なので、通常の教材修正と同時に更新する必要はない。詳しい設定は[Cloudflare README](README.md)を参照。
 
 公開CSVは簡単だが、Google側の公開反映は数分かかることがある。非公開の元シートを使うなら、対象Sheetへの閲覧権限を付けたサービスアカウント等でGoogle Sheets APIを呼び、秘密値はCloudflareのSecretに保存する。APIキーだけでは非公開Sheetの権限は得られない。共通教材のために利用者が各自Google連携する必要はない。
 
@@ -93,7 +88,7 @@ D1には利用者ID・教材・カードID・学習方向ごとに評価、回�
 
 ## 5. 切り替えの確認
 
-- 教材ID・件数・必須442枚、問題のヒント、別解、音声、使用参考例。
+- 教材ID・件数・Sheetで指定した必須文字、問題のヒント、別解、音声、使用参考例。
 - 未演習・少回数優先、通常演習の誤答48時間、復習モード、方向別評価。
 - Sheet編集の反映、不備・通信失敗時の正常版保持、演習途中の内容保持。
 - ログインごとの記録分離、別端末の同期、既存記録の移行。
@@ -116,4 +111,4 @@ git push
 
 公開前に確認したい変更は別ブランチとPull Requestを使い、Cloudflareのプレビューで確認してから本番ブランチへ統合する。Cloudflareでは接続リポジトリ・本番ブランチ・公開ディレクトリ、デプロイ結果、環境変数・Secret、必要に応じてドメインを管理する。
 
-教材は現状まだ同梱CSVなので、CSVを編集した場合もコードと同じコミット・pushが必要。外部Sheets連携を実装した後に、教材編集だけをSheetsで完結させられる。URLや鍵を追加するだけで新フォーマット、2シートの連携、ログイン・履歴同期まで完成したことにはしない。
+教材の追加・修正はGoogle Sheetsで完結し、再デプロイは不要。コード・接続先の設定を変更した場合はコミット・pushする。Sheets連携には利用者別ログイン・端末間の履歴同期は含まれない。

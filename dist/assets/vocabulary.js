@@ -1,8 +1,9 @@
 import { parseCSV } from './core.js';
 import { matchHangul } from './learning.js';
+import { sheetHeader, categoryLabels } from './sheet-fields.js';
 
 const clean = (value) => String(value ?? '').normalize('NFC').trim();
-const headerName = (value) => clean(value).toLowerCase();
+const headerName = sheetHeader;
 
 function contentHash(value) {
   let hash = 2166136261;
@@ -25,10 +26,9 @@ export function acceptedVocabularyAnswers(card) {
   let parts;
   if (/[,、/／]/u.test(full)) parts = full.split(/[,、/／]/u).map(clean);
   else if (full.includes('.')) parts = full.split('.').map(clean);
-  if (parts?.length > 1 && parts.every((part) => /^-?[가-힣]+-?$/u.test(part))) {
-    return [...new Set(parts)];
-  }
-  return [full];
+  const primary = parts?.length > 1 && parts.every((part) => /^-?[가-힣]+-?$/u.test(part)) ? parts : [full];
+  const explicit = Array.isArray(card?.answerVariants) ? card.answerVariants.map(clean).filter(Boolean) : [];
+  return [...new Set([...primary, ...explicit])];
 }
 
 /** Exact Hangul matching after NFC/whitespace normalization, without fuzziness. */
@@ -52,16 +52,19 @@ export function normalizeVocabulary(text) {
   const mainHan = column('korean', 'han', '韓国語', 'ハングル', 'ko_word', 'moments いろいろhello talk');
   const secondaryHan = column('alternatehan', 'alternate_han', '한글');
   const columns = {
-    id: column('id', 'no', '番号'),
+    id: column('id', 'id_word', 'no', '番号'),
     han: mainHan >= 0 ? mainHan : secondaryHan,
     japanese: column('japanese', '日本語', '和訳', '意味', 'youtube subtitle'),
     english: column('english', '英語', 'en'),
     state: column('state', '状態', 'read'),
     remember: column('remember', 'sourceremember'),
-    exampleKo: column('exampleko', 'example_ko', '例文（韓国語）', '例文(韓国語)'),
-    exampleJp: column('examplejp', 'example_jp', '例文（日本語）', '例文(日本語)'),
-    notes: column('notes', '備考', 'メモ'),
-    tags: column('tags', 'タグ', '#chat'),
+    exampleKo: column('例文_韓国語', 'exampleko', 'example_ko', '例文（韓国語）', '例文(韓国語)'),
+    exampleJp: column('例文_日本語', 'examplejp', 'example_jp', '例文（日本語）', '例文(日本語)'),
+    notes: column('解説', 'notes', '備考', 'メモ'),
+    tags: column('カテゴリ', 'tags', 'タグ', '#chat'),
+    topik: column('topik1'),
+    answerVariants: column('別解', '正解表記', 'acceptedanswers'),
+    synonyms: column('類語', 'synonyms'),
     alternateHan: secondaryHan,
   };
   if (columns.id < 0) columns.id = column('no.');
@@ -95,7 +98,7 @@ export function normalizeVocabulary(text) {
     const id = value('id') || `han:${han}:${contentHash(JSON.stringify([han, japanese, english]))}`;
     if (ids.has(id)) throw new Error(`${index + 1}行目: ID「${id}」が重複しています。先頭のNoまたはidを一意にしてください。`);
     ids.add(id);
-    cards.push({
+    const card = {
       id,
       han,
       kanji: japanese,
@@ -111,10 +114,21 @@ export function normalizeVocabulary(text) {
       tags: value('tags'),
       alternateHan: value('alternateHan'),
       sourceRemember: value('remember'),
-    });
+    };
+    if (columns.topik >= 0) {
+      // This sheet uses category text as its TOPIK1 marker, not a checkbox.
+      card.topik = Boolean(value('topik'));
+      card.topikCategory = value('topik');
+    }
+    if (columns.answerVariants >= 0) card.answerVariants = value('answerVariants').split(/\r?\n/u).map(clean).filter(Boolean);
+    if (columns.synonyms >= 0) card.synonyms = value('synonyms');
+    if (columns.topik >= 0 || headers.includes('カテゴリ')) {
+      card.categories = [...new Set([...categoryLabels(card.tags), ...categoryLabels(card.topikCategory)])];
+    }
+    cards.push(card);
   }
   const warnings = [];
   if (excludedRows) warnings.push(`${excludedRows}行（韓国語や訳のない行・見出し行）を学習対象から除外しました。`);
   if (!cards.length) warnings.push('学習できる単語カードがありません。');
-  return { cards, warnings, excludedRows };
+  return { cards, warnings, excludedRows, hasTopikColumn: columns.topik >= 0 };
 }

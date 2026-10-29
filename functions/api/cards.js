@@ -58,15 +58,15 @@ async function readLimitedBody(response) {
   return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
-export async function onRequest({ request, env }) {
+export async function proxySheetCSV(request, source) {
   if (!["GET", "HEAD"].includes(request.method)) {
     return reply(JSON.stringify({ error: "このAPIは読み取り専用です。" }), 405, { Allow: "GET, HEAD" });
   }
-  if (!env.SHEET_CSV_URL) return reply(JSON.stringify({ error: "スプレッドシートの接続先が未設定です。" }), 503);
+  if (!source) return reply(JSON.stringify({ error: "スプレッドシートの接続先が未設定です。" }), 503);
 
   let url;
   try {
-    url = sourceURL(env.SHEET_CSV_URL);
+    url = sourceURL(source);
   } catch {
     return reply(JSON.stringify({ error: "公開CSV URLの設定を確認してください。" }), 503);
   }
@@ -101,4 +101,8 @@ export async function onRequest({ request, env }) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+export function onRequest({ request, env }) {
+  return proxySheetCSV(request, env?.SHEET_CSV_URL);
 }
