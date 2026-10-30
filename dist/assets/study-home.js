@@ -63,15 +63,15 @@ function setRow(set, canCreate) {
 }
 
 /** Render the home screen. The caller owns state, event handling, and the set builder dialog. */
-export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = 'write', sets = [], query = '', group = 'all', canResume = false, canCreate = false } = {}) {
+export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = null, sets = [], query = '', group = 'all', canResume = false, canCreate = false } = {}) {
   const selectedCourse = courses.find(course => course.id === activeDeck);
   const available = selectedCourse?.available !== false;
   const normalizedQuery = searchValue(query).trim();
   const filteredSets = sets.filter(set => (group === 'all' || set.group === group) && (!normalizedQuery || searchValue(`${set.label ?? ''} ${set.group ?? ''}`).includes(normalizedQuery)));
   const groups = [...new Set([...GROUPS, ...sets.map(set => String(set.group ?? ''))])].filter(Boolean);
   const shownGroups = groups.filter(value => value === group || sets.some(set => set.group === value));
-  const modes = [{ id: 'write', label: '쓰기', direction: activeDeck === 'sentence' ? '日→한' : activeDeck === 'vocabulary' ? '単語→단어' : '漢→한' }, { id: 'read', label: '읽기', direction: activeDeck === 'sentence' ? '한→日' : activeDeck === 'vocabulary' ? '단어→単語' : '한→漢' }];
-  const selectedMode = mode === 'read' ? 'read' : 'write';
+  const modes = [{ id: 'read', label: '읽기', direction: activeDeck === 'sentence' ? '한→日' : activeDeck === 'vocabulary' ? '단어→単語' : '한→漢' }, { id: 'write', label: '쓰기', direction: activeDeck === 'sentence' ? '日→한' : activeDeck === 'vocabulary' ? '単語→단어' : '漢→한' }];
+  const selectedMode = mode === 'read' || mode === 'write' ? mode : activeDeck === 'kanji' ? 'write' : 'read';
   return `<div class="study-home">
     <h1 class="sr-only">ホーム</h1>
     <div class="home-courses" role="group" aria-label="教材を選ぶ">${courses.map(course => courseCard(course, activeDeck)).join('')}</div>

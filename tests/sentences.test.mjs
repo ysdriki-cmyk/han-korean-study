@@ -65,7 +65,7 @@ test('sentence learning, saved preferences and review dates remain independent f
   assert.equal(practicePool([card],saved,{...practiceSettings(),scope:'all'},now+4*day).length,0);
   assert.equal(practicePool([card],saved,{...practiceSettings(),scope:'all'},now+5*day).length,1);
   assert.equal(setProgress([card],saved,'write').masteredPercent,100);
-  const prefs=restorePracticePreferences({version:4,deckId:'sentence',courses:{sentence:{mode:'read',limit:'20'},vocabulary:{mode:'write'}}});
+  const prefs=restorePracticePreferences({version:4,modeDefaultsVersion:1,deckId:'sentence',courses:{sentence:{mode:'read',limit:'20'},vocabulary:{mode:'write'}}});
   assert.equal(prefs.deckId,'sentence');
   assert.equal(prefs.courses.sentence.mode,'read');
   assert.equal(prefs.courses.sentence.limit,'20');

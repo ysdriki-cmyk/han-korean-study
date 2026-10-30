@@ -65,7 +65,7 @@ test('status settings validate multi-selection, history periods and legacy filte
 });
 
 
-test('new defaults use writing, thirty shuffled cards, and only unpractised or failed ratings', () => {
+test('kanji defaults use writing, thirty shuffled cards, and only unpractised or failed ratings', () => {
   const defaults = practiceSettings();
   assert.equal(defaults.mode, 'write');
   assert.equal(defaults.limit, '30');
@@ -76,6 +76,34 @@ test('new defaults use writing, thirty shuffled cards, and only unpractised or f
   assert.equal(practiceSettings({ shuffle: false }).shuffle, false);
   assert.equal(practiceSettings({ limit: 30 }).limit, '30');
   assert.equal(practiceSettings({ limit: 99 }).limit, '30');
+});
+
+test('word and sentence defaults begin with reading, migrate once, then preserve explicit choices', () => {
+  const fresh = restorePracticePreferences(null);
+  assert.equal(fresh.courses.kanji.mode, 'write');
+  for (const id of ['vocabulary', 'sentence']) {
+    assert.equal(practiceSettings({}, id).mode, 'read');
+    assert.equal(fresh.courses[id].mode, 'read');
+    assert.equal(practiceSettings({mode:'write'}, id).mode, 'write');
+  }
+  const old = {version:4,deckId:'sentence',courses:{kanji:{mode:'write'},vocabulary:{mode:'write',limit:'50',shuffle:false,ratings:['again']},sentence:{mode:'write',limit:'20'}}};
+  const before = JSON.stringify(old);
+  const updated = restorePracticePreferences(old);
+  assert.equal(updated.courses.kanji.mode, 'write');
+  assert.equal(updated.courses.vocabulary.mode, 'read');
+  assert.equal(updated.courses.sentence.mode, 'read');
+  assert.equal(updated.courses.vocabulary.limit, '50');
+  assert.equal(updated.courses.vocabulary.shuffle, false);
+  assert.deepEqual(updated.courses.vocabulary.ratings, ['again']);
+  assert.equal(updated.courses.sentence.limit, '20');
+  assert.equal(updated.deckId, 'sentence');
+  assert.equal(JSON.stringify(old), before);
+  updated.courses.vocabulary.mode = 'write';
+  updated.courses.sentence.mode = 'write';
+  const reloaded = restorePracticePreferences(JSON.parse(JSON.stringify(updated)));
+  assert.equal(reloaded.courses.vocabulary.mode, 'write');
+  assert.equal(reloaded.courses.sentence.mode, 'write');
+  assert.deepEqual(restorePracticePreferences(reloaded), reloaded);
 });
 
 test('v4 saved preferences persist and v3 migrates once without retaining the old defaults', () => {

@@ -7,7 +7,7 @@ import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
 import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
-import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=14';
+import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=15';
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
 import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review.js?v=3';
 import { icon } from './icons.js?v=3';
@@ -15,7 +15,7 @@ import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
 import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
 import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=2';
-import { renderStudyHome } from './study-home.js?v=3';
+import { renderStudyHome } from './study-home.js?v=4';
 import { parseCategorySheet } from './category-sheet.js';
 
 const $ = selector => document.querySelector(selector);
@@ -221,7 +221,7 @@ function startSession(custom = null, { all = false, autoplay = false } = {}) {
 }
 function switchDeck(id) {
   if (!DECKS.some(deck => deck.id === id) || id === activeDeck || !deckData.has(id)) return;
-  savePreferences(); activeDeck = id; settings = practiceSettings(preferences.courses[id]);
+  savePreferences(); activeDeck = id; settings = practiceSettings(preferences.courses[id], id);
   cards = deckData.get(id).cards; selected.clear(); revealedRows.clear(); rankFilter = 'all'; page = 0;
   homeQuery = ''; homeGroup = 'all';
   $('#library-search').value = ''; syncSettingsForm(); startSession(null, { autoplay: view === 'study' }); renderLibrary(); savePreferences();
@@ -666,7 +666,7 @@ function bind() {
       draftSettings[field] = field === 'shuffle' ? raw === 'true' : ['limit','scope'].includes(field) ? raw : Number(raw);
       focusSelector = `[data-choice="${field}"][data-choice-value="${raw}"]`;
     } else if (target.id === 'reset-settings') {
-      draftSettings = practiceSettings({ mode: settings.mode, sessionType: settings.sessionType, libraryDirection: settings.libraryDirection });
+      draftSettings = practiceSettings({ mode: settings.mode, sessionType: settings.sessionType, libraryDirection: settings.libraryDirection }, activeDeck);
       focusSelector = '#reset-settings';
     } else return;
     renderSettings(); $(focusSelector)?.focus({ preventScroll: true });
@@ -707,7 +707,7 @@ function bind() {
 async function init() {
   $$('[data-icon]').forEach(el => { el.innerHTML = icon(el.dataset.icon); }); bind();
   preferences = restorePracticePreferences(readJSON(PREF_KEY, null), readJSON('han-hanja:preferences:v3', null));
-  activeDeck = getDeck(preferences.deckId || config.defaultDeck).id; settings = practiceSettings(preferences.courses[activeDeck]);
+  activeDeck = getDeck(preferences.deckId || config.defaultDeck).id; settings = practiceSettings(preferences.courses[activeDeck], activeDeck);
   selectedSetIds.kanji = preferences.courses.kanji?.scope === 'all' ? 'all' : 'essential';
   const setPreferences = readJSON(SET_PREF_KEY, null);
   if (setPreferences?.version === 1 && setPreferences.selected && typeof setPreferences.selected === 'object') {
@@ -722,7 +722,7 @@ async function init() {
     .catch(() => { topikState = 'error'; })
     .finally(() => { if (loaded && revealed) renderCard(); });
   if (!deckData.has(activeDeck) && deckData.size) {
-    activeDeck = deckData.keys().next().value; settings = practiceSettings(preferences.courses[activeDeck]);
+    activeDeck = deckData.keys().next().value; settings = practiceSettings(preferences.courses[activeDeck], activeDeck);
     notice('選んだ教材を開けなかったため、別の教材を表示しています。', true);
   }
   cards = deckData.get(activeDeck)?.cards || []; restoreRecords(); loaded = true; syncSettingsForm(); startSession(); renderLibrary(); savePreferences();

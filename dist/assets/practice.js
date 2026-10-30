@@ -53,20 +53,20 @@ export function makePracticeSession(cards, records = {}, settings = {}, { random
   return result;
 }
 
-/** An explicit previous choice is retained; new learners begin with writing. */
-export function resolvePracticeMode(preference = {}) {
+/** Explicit choices win; word/sentence practice starts with reading, kanji with writing. */
+export function resolvePracticeMode(preference = {}, deckId = 'kanji') {
   const source = object(preference);
   if (source.mode === 'read' || source.mode === 'write') return source.mode;
   if (source.stage === 'write') return 'write';
   if (source.stage === 'read') return 'read';
   if (source.stage === 'recall') return source.direction === 'han-ko' ? 'write' : 'read';
-  return 'write';
+  return deckId === 'vocabulary' || deckId === 'sentence' ? 'read' : 'write';
 }
 
-export function practiceSettings(preference = {}) {
+export function practiceSettings(preference = {}, deckId = 'kanji') {
   const source = object(preference);
   return {
-    mode: resolvePracticeMode(source),
+    mode: resolvePracticeMode(source, deckId),
     sessionType: source.sessionType === 'review' ? 'review' : 'practice',
     reviewDays: source.reviewDays !== null && source.reviewDays !== '' && [0, 1, 7, 30].includes(Number(source.reviewDays)) ? Number(source.reviewDays) : 7,
     filter: FILTERS.has(source.filter) ? source.filter : 'all',
@@ -81,27 +81,29 @@ export function practiceSettings(preference = {}) {
   };
 }
 
-/** Start the requested defaults once; later v4 saves keep the learner's choices. */
+/** Apply the reading-first defaults once; later saves retain explicit mode choices. */
 export function restorePracticePreferences(current, previous = null) {
   const saved = object(current);
   if (saved.version === 4 && saved.courses && typeof saved.courses === 'object' && !Array.isArray(saved.courses)) {
     return {
       ...saved,
       version: 4,
+      modeDefaultsVersion: 1,
       deckId: ['kanji', 'vocabulary', 'sentence'].includes(saved.deckId) ? saved.deckId : 'kanji',
       courses: {
         ...saved.courses,
-        kanji: practiceSettings(saved.courses.kanji),
-        vocabulary: practiceSettings(saved.courses.vocabulary),
-        sentence: practiceSettings(saved.courses.sentence),
+        kanji: practiceSettings(saved.courses.kanji, 'kanji'),
+        vocabulary: practiceSettings(saved.modeDefaultsVersion === 1 ? saved.courses.vocabulary : { ...object(saved.courses.vocabulary), mode: 'read' }, 'vocabulary'),
+        sentence: practiceSettings(saved.modeDefaultsVersion === 1 ? saved.courses.sentence : { ...object(saved.courses.sentence), mode: 'read' }, 'sentence'),
       },
     };
   }
   const legacy = object(previous ?? current);
   return {
     version: 4,
+    modeDefaultsVersion: 1,
     deckId: 'kanji',
-    courses: Object.fromEntries(['kanji', 'vocabulary', 'sentence'].map(id => [id, practiceSettings({ libraryDirection: object(object(legacy.courses)[id]).libraryDirection })])),
+    courses: Object.fromEntries(['kanji', 'vocabulary', 'sentence'].map(id => [id, practiceSettings({ libraryDirection: object(object(legacy.courses)[id]).libraryDirection }, id)])),
   };
 }
 
