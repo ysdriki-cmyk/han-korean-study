@@ -10,14 +10,14 @@
   <link rel="stylesheet" href="./assets/practice.css?v=4">
   <link rel="stylesheet" href="./assets/supporting.css">
   <link rel="stylesheet" href="./assets/ratings.css?v=4">
-  <link rel="stylesheet" href="./assets/review.css?v=6">
+  <link rel="stylesheet" href="./assets/review.css?v=7">
   <link rel="stylesheet" href="./assets/topik.css?v=6">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
-  <link rel="stylesheet" href="./assets/navigation.css?v=1">
+  <link rel="stylesheet" href="./assets/navigation.css?v=2">
   <link rel="stylesheet" href="./assets/study-home.css?v=3">
   <link rel="stylesheet" href="./assets/sentences.css?v=1">
   <script src="./assets/config.js?v=3" defer></script>
-  <script type="module" src="./assets/app.js?v=32"></script>
+  <script type="module" src="./assets/app.js?v=33"></script>
 </head>
 <body data-view="home">
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -25,7 +25,7 @@
   <div class="header-identity">
     <a class="brand" href="#home" aria-label="한と漢 ホーム"><span class="brand-mark">한</span><strong>한と漢</strong></a>
   </div>
-  <span id="save-status" class="save-status">自動保存</span>
+  <button id="open-global-settings" type="button" class="header-settings" aria-label="出題設定" aria-haspopup="dialog" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg><span>出題設定</span></button>
 </header>
 <main id="main" tabindex="-1">
   <div id="notice" class="notice" role="status" hidden></div>
@@ -54,7 +54,7 @@
           <button type="button" data-practice-type="practice" aria-pressed="true">通常演習</button>
           <button type="button" data-practice-type="review" aria-pressed="false">復習</button>
         </div>
-        <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="出題設定" title="出題設定"><span data-icon="sliders"></span><span>出題設定</span></button>
+        <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="この教材の設定" title="この教材の設定"><span data-icon="sliders"></span><span>個別設定</span></button>
       </div>
     </div>
     <nav class="main-nav" aria-label="メインメニュー">
@@ -86,6 +86,7 @@
   <div class="dialog-heading"><h2 id="settings-title">出題設定</h2><button id="close-settings" class="icon-button" aria-label="閉じる">×</button></div>
   <form id="settings-form">
     <div class="settings-content">
+      <div id="settings-target" class="settings-target" role="group" aria-label="設定の適用先"><button type="button" data-settings-target="common" aria-pressed="true">すべて共通</button><button type="button" data-settings-target="course" aria-pressed="false">この教材のみ</button></div>
       <section id="settings-normal-presets" class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
       <section id="settings-scope-section" class="settings-section"><h3>出題範囲</h3><div id="settings-scope" class="choice-row" role="group" aria-label="出題範囲"></div></section>
       <section id="settings-normal-ratings" class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div></section>
@@ -98,7 +99,7 @@
         <h3>最近演習したカードを除く</h3><div id="settings-recent" class="choice-row" role="group" aria-label="最近の演習を除外"></div>
       </details>
     </div>
-    <div class="settings-footer"><span class="settings-match"><strong id="settings-match">0</strong> 枚が対象</span><button id="reset-settings" type="button" class="reset-settings">初期設定</button><button id="save-settings" type="button" class="button secondary">設定だけ保存</button><button id="apply-settings" type="submit" class="button primary">演習を始める</button></div>
+    <div class="settings-footer"><span class="settings-match" id="settings-match-label"><strong id="settings-match">0</strong> 枚が対象</span><span id="settings-common-label" class="settings-match" hidden>全教材に適用</span><button id="reset-settings" type="button" class="reset-settings">初期設定</button><button id="save-settings" type="button" class="button secondary">設定だけ保存</button><button id="apply-settings" type="submit" class="button primary">演習を始める</button></div>
   </form>
 </dialog>
 <div id="toast" class="toast" role="status" hidden></div>

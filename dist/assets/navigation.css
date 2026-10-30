@@ -1,6 +1,10 @@
 /* Keep the question first; secondary controls sit beneath the practice tool. */
-.app-header { height: 72px; }
-.save-status { margin-left: auto; }
+.app-header { height: 72px; flex-wrap: nowrap; }
+.header-identity { width: auto; flex: 1; min-width: 0; }
+.header-settings { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; margin-left: auto; padding: 8px 12px; border: 1px solid #dce4ef; border-radius: 9px; background: white; color: #526075; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.header-settings svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.header-settings:hover { border-color: #a9c9f4; color: #2269cc; background: #f8fbff; }
+.header-settings:disabled { opacity: .5; cursor: wait; }
 .workspace-controls {
   display: flex;
   flex-wrap: wrap;
@@ -95,6 +99,7 @@
 }
 @media (max-width: 720px) {
   .app-header { min-height: 68px; height: auto; padding-top: 12px; padding-bottom: 12px; }
+  .header-settings { min-height: 38px; gap: 6px; padding: 7px 10px; font-size: 12px; }
   .workspace-controls { gap: 8px; padding-top: 10px; }
   .workspace-controls .mode-toolbar { display: grid; gap: 6px; min-width: 0; }
   .workspace-controls .mode-switch { width: 100%; }

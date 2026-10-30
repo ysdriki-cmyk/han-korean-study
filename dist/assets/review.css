@@ -6,6 +6,9 @@
 .settings-presets .preset-button { font-size: 13px; padding: 10px 8px; }
 .settings-footer { flex-wrap: wrap; gap: 10px; }
 .settings-match { margin-right: auto; }
+.settings-target { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px; margin-bottom: 22px; padding: 4px; border-radius: 10px; background: #edf1f6; }
+.settings-target button { min-height: 40px; padding: 8px 12px; border: 1px solid transparent; border-radius: 7px; color: #758196; font-size: 13px; font-weight: 600; }
+.settings-target button[aria-pressed=true] { border-color: #cbdcf4; background: white; color: #2269cc; box-shadow: 0 1px 3px #23354d08; }
 .reset-settings { color: #667085; font-size: 12px; padding: 8px 2px; }
 .reset-settings:hover { color: var(--blue); }
 #save-settings { font-size: 13px; }

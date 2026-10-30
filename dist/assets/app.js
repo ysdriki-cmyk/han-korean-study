@@ -7,7 +7,7 @@ import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
 import { renderTopikUsage } from './topik-view.js?v=6';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
-import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences } from './practice.js?v=15';
+import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences, sharedPracticeSettings, applyPracticeSettings } from './practice.js?v=16';
 import { essentialKanji, kanjiPromptChoices, kanjiAnswersForPrompt } from './kanji.js';
 import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review.js?v=3';
 import { icon } from './icons.js?v=3';
@@ -29,6 +29,7 @@ const STATUSES = [...RATINGS, UNSEEN];
 const ratingById = new Map(STATUSES.map(item => [item.id, item]));
 const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '完璧', unseen: '未回答' };
 let draftSettings = null;
+let settingsTarget = 'course', settingsDrafts = {};
 let topikExamples = [], topikState = 'loading';
 const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'home', activeDeck = 'kanji';
@@ -70,7 +71,7 @@ function notice(text, error = false) {
 }
 function safeWrite(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); return true; }
-  catch { storageAvailable = false; $('#save-status').textContent = '一時記録'; notice('このブラウザでは記録を保存できません。サイトデータの保存を許可すると、続きから演習できます。', true); return false; }
+  catch { storageAvailable = false; notice('このブラウザでは記録を保存できません。サイトデータの保存を許可すると、続きから演習できます。', true); return false; }
 }
 function toast(text, error = false) {
   clearTimeout(toastTimer); const el = $('#toast'); if (!el) return;
@@ -84,8 +85,9 @@ function saveRecords() { safeWrite(RECORD_KEY, { version: 3, records }); }
 function savePreferences() {
   preferences.version = 4; preferences.deckId = activeDeck;
   preferences.courses[activeDeck] = { ...preferences.courses[activeDeck], ...settings };
-  safeWrite(PREF_KEY, preferences);
-  safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds });
+  const saved = safeWrite(PREF_KEY, preferences);
+  const setsSaved = safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds });
+  return saved && setsSaved;
 }
 function availableStudySets(id = activeDeck) {
   if (id === 'sentence') return projectSentenceSets(availableStudySets('vocabulary')).filter(set => cardsForStudySet(deckData.get('sentence')?.cards || [], set).length);
@@ -137,6 +139,7 @@ function counts() {
 function pool() { return practicePool(studyCards(), records, scopedSettings()); }
 function updateCourseChrome() {
   const deck = getDeck(activeDeck), target = deck.answerLabel;
+  $('#open-global-settings').disabled = !loaded;
   $('.brand strong').textContent = view === 'home' ? '한と漢' : activeDeck === 'kanji' ? '한漢' : deck.label;
   $$('[data-practice-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.practiceType === settings.sessionType)));
   $$('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.mode)));
@@ -181,15 +184,18 @@ function renderSettings() {
   const scopedCards = studyCards();
   const totals = Object.fromEntries(STATUSES.map(item => [item.id, 0]));
   scopedCards.forEach(card => { totals[rank(card)] += 1; });
-  const reviewing = draftSettings.sessionType === 'review';
+  const common = settingsTarget === 'common';
+  const reviewing = !common && draftSettings.sessionType === 'review';
+  $$('[data-settings-target]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.settingsTarget === settingsTarget)); });
+  $('[data-settings-target="course"]').textContent = `${activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}のみ`;
   $('#settings-normal-presets').hidden = reviewing;
   $('#settings-normal-ratings').hidden = reviewing;
   $('#settings-advanced').hidden = reviewing;
-  $('#settings-review-period').hidden = !reviewing;
+  $('#settings-review-period').hidden = !reviewing && !common;
   $('#settings-review-days').innerHTML = choiceButtons('reviewDays', [[1,'24時間'],[7,'7日'],[30,'30日'],[0,'履歴すべて']]);
   const presets = [{id:'default', label:'未演習・❌以下', ratings:['hard','again','unseen']}, {id:'all', label:'すべて', ratings:STATUSES.map(item => item.id)}, {id:'weak', label:'苦手を集中', ratings:['hard','again','unsure']}, {id:'new', label:'未演習から', ratings:['unseen']}];
   $('#settings-presets').innerHTML = presets.map(item => `<button type="button" class="preset-button" data-preset="${item.id}" aria-pressed="${!draftSettings.recentMistakesDays && !draftSettings.excludeRecentDays && item.ratings.length === draftSettings.ratings.length && item.ratings.every(id => draftSettings.ratings.includes(id))}">${item.label}</button>`).join('');
-  $('#settings-ratings').innerHTML = STATUSES.map(item => `<button type="button" class="rating-choice rating-${item.id}" data-settings-rating="${item.id}" aria-pressed="${draftSettings.ratings.includes(item.id)}" aria-label="${esc(item.label)} ${totals[item.id]}枚"><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span><span class="rating-count">${totals[item.id].toLocaleString('ja-JP')}枚</span></button>`).join('');
+  $('#settings-ratings').innerHTML = STATUSES.map(item => `<button type="button" class="rating-choice rating-${item.id}" data-settings-rating="${item.id}" aria-pressed="${draftSettings.ratings.includes(item.id)}" aria-label="${esc(item.label)}${common ? '' : ` ${totals[item.id]}枚`}"><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span>${common ? '' : `<span class="rating-count">${totals[item.id].toLocaleString('ja-JP')}枚</span>`}</button>`).join('');
   $('#settings-limit').innerHTML = choiceButtons('limit', [['10','10枚'],['20','20枚'],['30','30枚'],['50','50枚'],['all','すべて']]);
   $('#settings-scope-section').hidden = true;
   const requiredCount = cards.filter(essentialKanji).length;
@@ -201,8 +207,11 @@ function renderSettings() {
   const matching = practicePool(studyCards(), records, scopedSettings(draftSettings)).length;
   const amount = draftSettings.limit === 'all' ? matching : Math.min(matching, Number(draftSettings.limit));
   $('#settings-match').textContent = matching.toLocaleString('ja-JP');
-  $('#apply-settings').textContent = amount ? `${amount.toLocaleString('ja-JP')}枚で始める` : '対象がありません';
-  $('#apply-settings').disabled = !amount;
+  $('#settings-match-label').hidden = common;
+  $('#settings-common-label').hidden = !common;
+  $('#save-settings').hidden = common;
+  $('#apply-settings').textContent = common ? '設定を保存' : amount ? `${amount.toLocaleString('ja-JP')}枚で始める` : '対象がありません';
+  $('#apply-settings').disabled = !common && !amount;
 }
 
 function speakQuestion() {
@@ -581,7 +590,24 @@ async function refreshRemote() {
   } catch (error) { console.warn('[教材更新]', error instanceof Error ? error.message : '更新を確認できませんでした。'); }
   finally { polling = false; }
 }
-function openSettings() { speaker.stop(); syncSettingsForm(); renderSettings(); $('#practice-settings').showModal(); }
+function openSettings(target = 'course') {
+  speaker.stop(); syncSettingsForm();
+  settingsDrafts = { course: draftSettings, common: { ...settings, ...sharedPracticeSettings(preferences.commonPractice) } };
+  settingsTarget = target === 'common' ? 'common' : 'course';
+  draftSettings = settingsDrafts[settingsTarget];
+  renderSettings(); $('#practice-settings').showModal();
+}
+function persistSettings({ start = false } = {}) {
+  preferences = applyPracticeSettings(preferences, draftSettings, { target: settingsTarget, deckId: activeDeck });
+  settings = practiceSettings(preferences.courses[activeDeck], activeDeck);
+  if (!savePreferences()) { toast('設定を保存できませんでした', true); return; }
+  $('#practice-settings').close();
+  if (start) { startSession(); setView('study'); renderLibrary(); speakQuestion(); }
+  else {
+    updateCourseChrome(); renderOverview(); renderLibrary();
+    toast(settingsTarget === 'common' ? '全教材の基本設定を保存しました' : 'この教材の設定を保存しました');
+  }
+}
 function handleCardAction(action) {
   if (action === 'reveal') reveal();
   else if (action === 'advance') advance();
@@ -648,12 +674,18 @@ function bind() {
     if (event.target.id === 'write-form') { event.preventDefault(); if (!composing) checkWriting(); }
   });
   $('#new-session').onclick = () => startSession(null, { autoplay: true });
-  $('#open-settings').onclick = openSettings;
+  $('#open-settings').onclick = () => openSettings('course');
+  $('#open-global-settings').onclick = () => openSettings('common');
   $('#close-settings').onclick = () => $('#practice-settings').close();
   $('#settings-form').onclick = event => {
     const target = event.target.closest('button'); if (!target) return;
     let focusSelector;
-    if (target.dataset.settingsRating) {
+    if (target.dataset.settingsTarget) {
+      settingsDrafts[settingsTarget] = draftSettings;
+      settingsTarget = target.dataset.settingsTarget;
+      draftSettings = settingsDrafts[settingsTarget];
+      focusSelector = `[data-settings-target="${settingsTarget}"]`;
+    } else if (target.dataset.settingsRating) {
       const id = target.dataset.settingsRating;
       draftSettings.ratings = draftSettings.ratings.includes(id) ? draftSettings.ratings.filter(value => value !== id) : [...draftSettings.ratings, id];
       focusSelector = `[data-settings-rating="${id}"]`;
@@ -672,16 +704,12 @@ function bind() {
     renderSettings(); $(focusSelector)?.focus({ preventScroll: true });
   };
   $('#settings-due').onchange = event => { draftSettings.includeDue = event.target.checked; renderSettings(); };
-  $('#save-settings').onclick = () => {
-    const modeChanged = settings.mode !== draftSettings.mode;
-    settings = practiceSettings({ ...draftSettings, filter: 'all' }); savePreferences();
-    if (modeChanged) { startSession(); renderLibrary(); }
-    $('#practice-settings').close(); toast('演習設定を保存しました');
-  };
+  $('#save-settings').onclick = () => persistSettings();
   $('#settings-form').onsubmit = event => {
-    event.preventDefault(); if (!practicePool(studyCards(), records, scopedSettings(draftSettings)).length) return;
-    settings = practiceSettings({ ...draftSettings, filter: 'all' });
-    savePreferences(); $('#practice-settings').close(); startSession(); setView('study'); renderLibrary(); speakQuestion();
+    event.preventDefault();
+    if (settingsTarget === 'common') { persistSettings(); return; }
+    if (!practicePool(studyCards(), records, scopedSettings(draftSettings)).length) return;
+    persistSettings({ start: true });
   };
   $('#library-search').oninput = () => { page = 0; renderLibrary(); };
   $('#library-hide').onchange = () => { revealedRows.clear(); renderLibrary(); };

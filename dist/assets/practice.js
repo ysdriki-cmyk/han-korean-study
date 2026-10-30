@@ -81,6 +81,26 @@ export function practiceSettings(preference = {}, deckId = 'kanji') {
   };
 }
 
+const BASIC_FIELDS = ['ratings', 'limit', 'shuffle', 'includeDue', 'recentMistakesDays', 'excludeRecentDays', 'reviewDays'];
+
+/** Basic question criteria can be shared without changing direction, session type or selected sets. */
+export function sharedPracticeSettings(preference = {}) {
+  const normalized = practiceSettings(preference);
+  return Object.fromEntries(BASIC_FIELDS.map(key => [key, normalized[key]]));
+}
+
+/** Common saves explicitly align all courses; individual saves keep the common template intact. */
+export function applyPracticeSettings(preferences, draft, { target = 'common', deckId = 'kanji' } = {}) {
+  if (!['common', 'course'].includes(target) || !['kanji', 'vocabulary', 'sentence'].includes(deckId)) throw new RangeError('設定の適用先を確認してください。');
+  const source = restorePracticePreferences(preferences);
+  const basic = sharedPracticeSettings(draft);
+  const courses = { ...source.courses };
+  for (const id of target === 'common' ? ['kanji', 'vocabulary', 'sentence'] : [deckId]) {
+    courses[id] = practiceSettings({ ...courses[id], ...basic, filter: 'all' }, id);
+  }
+  return { ...source, courses, ...(target === 'common' ? { commonPractice: basic } : {}) };
+}
+
 /** Apply the reading-first defaults once; later saves retain explicit mode choices. */
 export function restorePracticePreferences(current, previous = null) {
   const saved = object(current);
