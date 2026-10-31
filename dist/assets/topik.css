@@ -190,8 +190,19 @@
   color: #667085;
   font-size: 13px;
 }
-.usage-reference:not(.usage-compact) .usage-example-content { padding: 14px 16px; }
-.usage-reference:not(.usage-compact) .usage-example-content .usage-sentence + .usage-sentence { margin-top: 14px; }
+.vocabulary-example .usage-sentence {
+  margin: 0;
+  color: var(--ink, #263348);
+  font-size: 16px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.vocabulary-example .usage-sentence + .usage-sentence {
+  margin-top: 18px;
+  color: #667085;
+  font-size: 14px;
+}
 @media(max-width:720px) {
  .usage-compact .usage-table th,
  .usage-compact .usage-table td { padding-top: 8px; padding-bottom: 8px; }

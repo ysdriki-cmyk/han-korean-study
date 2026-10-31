@@ -1,10 +1,10 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=2';
 import { sentencesFromVocabulary, matchSentenceAnswer } from './sentences.js';
-import { matchVocabularyAnswer, acceptedVocabularyAnswers } from './vocabulary.js';
+import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
 import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
-import { renderTopikUsage } from './topik-view.js?v=7';
+import { renderTopikUsage, renderVocabularyExample } from './topik-view.js?v=8';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences, sharedPracticeSettings, applyPracticeSettings } from './practice.js?v=16';
@@ -247,8 +247,6 @@ function answerRows(card) {
   const main = settings.mode === 'write'
     ? `<div class="answer-row"><span class="answer-label">韓国語</span><p class="answer-value hangul" lang="ko">${esc(card.han)}${speechButton(card.han)}</p></div>`
     : answerFields(card, activeDeck).map(field => `<div class="answer-row"><span class="answer-label">${esc(field.label)}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('');
-  const examples = activeDeck === 'vocabulary' && (card.exampleKo || card.exampleJp)
-    ? `<details class="example-block"><summary>例文</summary>${card.exampleKo ? `<p lang="ko">${esc(card.exampleKo)}${speechButton(card.exampleKo)}</p>` : ''}${card.exampleJp ? `<p lang="ja">${esc(card.exampleJp)}</p>` : ''}</details>` : '';
   const otherHints = activeDeck === 'kanji' && settings.mode === 'write' ? answerFields(card, activeDeck).map(field => `<div class="answer-row"><span class="answer-label">${esc(field.label)}</span><p class="answer-value" lang="ja">${esc(field.text)}</p></div>`).join('') : '';
   const alternatives = activeDeck === 'kanji' && settings.mode === 'write' ? kanjiAnswersForPrompt(sessionCards, currentKanjiHint(card)).filter(answer => answer !== card.han) : [];
   const wordNotes = activeDeck === 'vocabulary'
@@ -256,7 +254,7 @@ function answerRows(card) {
       .filter(field => field.text).map(field => `<div class="answer-row"><span class="answer-label">${field.label}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('')
     : '';
   const focusWord = activeDeck === 'sentence' && card.sourceWord ? `<section class="sentence-word"><h3>今回の単語</h3><div class="table-wrap"><table><thead><tr><th>韓国語</th><th>英語</th><th>日本語</th></tr></thead><tbody><tr><td lang="ko">${esc(card.sourceWord.han)}${speechButton(card.sourceWord.han)}</td><td lang="en">${esc(card.sourceWord.english || card.sourceWord.meaning || '—')}</td><td lang="ja">${esc(card.sourceWord.kanji || '—')}</td></tr></tbody></table></div></section>` : '';
-  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + examples + focusWord;
+  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + focusWord;
 }
 function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);
@@ -313,7 +311,7 @@ function renderCard() {
   actions += cardNavigation();
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label>${activeDeck === 'sentence' ? `<textarea id="hangul-input" rows="3" placeholder="韓国語の例文を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(submitted)}</textarea>` : `<input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}">`}</form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? renderTopikUsage(topikExamples, activeDeck === 'vocabulary' ? acceptedVocabularyAnswers(card) : card.han, topikState, { showSentences: activeDeck === 'vocabulary' }) : ''}`;
+  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;

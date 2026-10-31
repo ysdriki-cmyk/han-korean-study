@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {renderTopikUsage} from '../dist/assets/topik-view.js';
+import {renderTopikUsage, renderVocabularyExample} from '../dist/assets/topik-view.js';
+
+test('vocabulary shows only its own available sentences, including non-TOPIK cards', () => {
+  const html = renderVocabularyExample({han:'고맙다',english:'thank',kanji:'ありがたい',topik:'',exampleKo:'멋진 선물 고마워 <script>',exampleJp:'素敵なプレゼント、ありがとう & 感謝'});
+  assert.ok(html.includes('멋진 선물 고마워 &lt;script&gt;'));
+  assert.ok(html.includes('素敵なプレゼント、ありがとう &amp; 感謝'));
+  assert.ok(html.indexOf('lang="ko"') < html.indexOf('lang="ja"><small'));
+  assert.equal((html.match(/data-speak=/g)||[]).length,1);
+  for (const redundant of ['<table', 'TOPIK1', '使用参考例', 'ありがたい', 'thank', '<details', '<script>']) assert.ok(!html.includes(redundant));
+  assert.equal(renderVocabularyExample({}), '');
+  assert.ok(!renderVocabularyExample({exampleJp:'日本語だけ'}).includes('data-speak='));
+  assert.ok(!renderVocabularyExample({exampleKo:'한국어만'}).includes('日本語訳'));
+});
 
 test('reference words, sentences and search terms remain escaped text', () => {
   const rows = [{korean:'가<script>alert(1)</script>',english:'<img src=x onerror=alert(1)>',japanese:'価格 & 値段',exampleKo:'가다 <svg onload=alert(1)>',exampleJa:'「行く」<script>bad()</script>'}];

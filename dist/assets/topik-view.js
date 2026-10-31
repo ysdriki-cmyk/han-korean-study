@@ -20,6 +20,13 @@ function highlight(value, query) {
   }
   return result;
 }
+
+/** The word and translations are already shown in the answer above. */
+export function renderVocabularyExample(card) {
+  if (!card.exampleKo && !card.exampleJp) return '';
+  return `<section class="usage-reference vocabulary-example" aria-label="例文">${card.exampleKo ? `<p class="usage-sentence" lang="ko"><small class="usage-sentence-label" lang="ja">例文</small>${esc(card.exampleKo)}${speechButton(card.exampleKo)}</p>` : ''}${card.exampleJp ? `<p class="usage-sentence" lang="ja"><small class="usage-sentence-label">日本語訳</small>${esc(card.exampleJp)}</p>` : ''}</section>`;
+}
+
 function exampleTable(entries, query, showSentences) {
   const rows = entries.map((entry, index) => {
     const hasSentence = Boolean(entry.exampleKo || entry.exampleJa);
