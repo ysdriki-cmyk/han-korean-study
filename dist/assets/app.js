@@ -143,6 +143,7 @@ function updateCourseChrome() {
   $('.brand strong').textContent = view === 'home' ? '한と漢' : activeDeck === 'kanji' ? '한漢' : deck.label;
   $$('[data-practice-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.practiceType === settings.sessionType)));
   $$('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.mode)));
+  $('#settings-course-label').textContent = activeDeck === 'kanji' ? '한漢' : deck.label;
   $('#read-mode-label').innerHTML = activeDeck === 'sentence' ? '읽기<span class="mode-direction">（한→日）</span>' : activeDeck === 'vocabulary' ? '읽기<span class="mode-direction">（단어→単語）</span>' : '읽기（한→漢）';
   $('#write-mode-label').innerHTML = activeDeck === 'sentence' ? '쓰기<span class="mode-direction">（日→한）</span>' : activeDeck === 'vocabulary' ? '쓰기<span class="mode-direction">（単語→단어）</span>' : '쓰기（漢→한）';
   $('#library-answer-label').textContent = target;
@@ -366,11 +367,11 @@ function previous() {
 }
 function setView(next, { hash = true } = {}) {
   speaker.stop();
+  if ($('#practice-settings').open) $('#practice-settings').close();
   if (view === 'study' && next !== 'study' && loaded && session[position]) saveCardView();
   view = ['home', 'study', 'library', 'progress'].includes(next) ? next : 'home';
   document.body.dataset.view = view;
   $$('.view').forEach(el => { el.hidden = el.id !== `${view}-view`; });
-  $('.workspace-controls').hidden = view === 'home';
   $$('.main-nav [data-view]').forEach(button => {
     const active = button.dataset.view === view; button.classList.toggle('active', active);
     if (active) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
@@ -638,6 +639,7 @@ function bind() {
     if (target.hasAttribute('data-set-group')) { homeGroup = target.dataset.setGroup; renderHome(); return; }
     if (target.hasAttribute('data-resume-study')) { setView('study'); speakQuestion(); return; }
     if (target.dataset.speak) { speaker.toggle(target.dataset.speak); return; }
+    if (target.closest('#practice-settings') && (target.dataset.practiceType || target.dataset.mode || target.dataset.view)) $('#practice-settings').close();
     if (target.dataset.practiceType && loaded) switchPracticeType(target.dataset.practiceType);
     if (target.dataset.mode && loaded) switchMode(target.dataset.mode);
     if (target.dataset.view) { setView(target.dataset.view); if (target.dataset.view === 'study') speakQuestion(); }
@@ -672,7 +674,6 @@ function bind() {
     if (event.target.id === 'write-form') { event.preventDefault(); if (!composing) checkWriting(); }
   });
   $('#new-session').onclick = () => startSession(null, { autoplay: true });
-  $('#open-settings').onclick = () => openSettings('course');
   $('#open-global-settings').onclick = () => openSettings('common');
   $('#close-settings').onclick = () => $('#practice-settings').close();
   $('#settings-form').onclick = event => {

@@ -1,4 +1,4 @@
-/* Keep the question first; secondary controls sit beneath the practice tool. */
+/* Secondary navigation is available only inside the header settings dialog. */
 .app-header { height: 72px; flex-wrap: nowrap; }
 .header-identity { width: auto; flex: 1; min-width: 0; }
 .header-settings { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; margin-left: auto; padding: 8px 12px; border: 1px solid #dce4ef; border-radius: 9px; background: white; color: #526075; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; }
@@ -6,110 +6,44 @@
 .header-settings:hover { border-color: #a9c9f4; color: #2269cc; background: #f8fbff; }
 .header-settings:disabled { opacity: .5; cursor: wait; }
 .workspace-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px 20px;
-  margin-top: 14px;
-  padding: 10px 0;
-  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 14px;
+  margin-bottom: 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line);
 }
-.workspace-controls .mode-toolbar {
-  display: flex;
-  flex: 1 1 auto;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-  margin: 0;
-}
+.settings-course-label { color: #526075; font-size: 13px; }
+.workspace-controls .mode-toolbar { display: grid; gap: 12px; margin: 0; }
 .workspace-controls .mode-switch {
-  display: flex;
-  flex: 0 1 auto;
-  width: auto;
-  gap: 3px;
-  padding: 3px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  gap: 4px;
+  padding: 4px;
   border: 0;
-  border-radius: 9px;
-  background: #e9edf3;
+  border-radius: 10px;
+  background: #edf1f6;
 }
-.workspace-controls .mode-switch button {
-  justify-content: center;
-  min-height: 38px;
-  padding: 6px 10px;
-  gap: 7px;
-  border-radius: 6px;
-}
-.workspace-controls .mode-copy strong { font-size: 13px; font-weight: 500; }
+.workspace-controls .mode-switch button { min-width: 0; min-height: 44px; justify-content: center; gap: 7px; padding: 8px; border-radius: 7px; }
+.workspace-controls .mode-copy strong { white-space: normal; font-size: 13px; font-weight: 500; }
 .workspace-controls .mode-direction { display: inline; font-size: inherit; }
-.workspace-controls .mode-switch svg { width: 16px; height: 16px; }
-.workspace-controls .practice-tools {
-  width: auto;
-  gap: 6px;
-  margin: 0;
-}
-.workspace-controls .practice-type-switch {
-  gap: 2px;
-  padding: 3px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-}
-.workspace-controls .practice-type-switch button {
-  min-height: 38px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-}
-.workspace-controls .settings-button {
-  width: auto;
-  min-height: 38px;
-  padding: 6px 9px;
-  border-color: transparent;
-  border-radius: 6px;
-  background: transparent;
-  box-shadow: none;
-  font-size: 12px;
-}
-.workspace-controls .settings-button svg { width: 16px; height: 16px; }
-.workspace-controls .main-nav { width: auto; margin: 0; gap: 3px; }
-.workspace-controls .nav-item {
-  flex: 0 1 auto;
-  justify-content: center;
-  min-height: 38px;
-  padding: 6px 10px;
-  gap: 6px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 500;
-}
-.workspace-controls .nav-item svg { width: 16px; height: 16px; }
-.workspace-controls .nav-item.active {
-  color: #2269cc;
-  background: #e8f2ff;
-  border-color: #cddff8;
-  box-shadow: none;
-}
+.workspace-controls .mode-switch svg { width: 17px; height: 17px; }
+.workspace-controls .practice-tools { width: 100%; margin: 0; }
+.workspace-controls .practice-type-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+.workspace-controls .practice-type-switch button { min-height: 40px; }
+.workspace-controls .main-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; margin: 0; gap: 6px; }
+.workspace-controls .nav-item { min-width: 0; min-height: 44px; justify-content: center; gap: 6px; padding: 8px 6px; border-radius: 8px; font-size: 13px; font-weight: 500; }
+.workspace-controls .nav-item svg { width: 17px; height: 17px; }
+.workspace-controls .nav-item.active { color: #2269cc; background: #e8f2ff; border-color: #cddff8; box-shadow: none; }
 .workspace-controls .nav-count { display: none; }
-
-@media (max-width: 960px) {
-  .workspace-controls .mode-toolbar { flex-basis: 100%; }
-  .workspace-controls .main-nav { margin-left: auto; }
-}
 @media (max-width: 720px) {
   .app-header { min-height: 68px; height: auto; padding-top: 12px; padding-bottom: 12px; }
   .header-settings { min-height: 38px; gap: 6px; padding: 7px 10px; font-size: 12px; }
-  .workspace-controls { gap: 8px; padding-top: 10px; }
-  .workspace-controls .mode-toolbar { display: grid; gap: 6px; min-width: 0; }
-  .workspace-controls .mode-switch { width: 100%; }
-  .workspace-controls .mode-switch button { flex: 1; padding: 7px 5px; }
+  .workspace-controls { gap: 12px; }
   .workspace-controls .mode-copy strong { font-size: 12px; }
-  .workspace-controls .practice-tools { width: 100%; justify-content: space-between; }
-  .workspace-controls .settings-button > span:last-child { display: inline; }
-  .workspace-controls .main-nav { width: 100%; margin: 0; padding-top: 8px; border-top: 1px solid #e5eaf1; }
-  .workspace-controls .nav-item { flex: 1; min-height: 40px; }
 }
-@media (max-width: 374px) {
-  .workspace-controls .mode-copy strong { font-size: 11px; }
+@media (max-width: 420px) {
+  .workspace-controls .mode-switch button { gap: 4px; padding: 7px 3px; }
+  .workspace-controls .mode-switch svg { display: none; }
+  .workspace-controls .nav-item { flex-direction: column; gap: 3px; font-size: 12px; }
 }

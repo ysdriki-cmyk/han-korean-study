@@ -13,11 +13,11 @@
   <link rel="stylesheet" href="./assets/review.css?v=7">
   <link rel="stylesheet" href="./assets/topik.css?v=8">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
-  <link rel="stylesheet" href="./assets/navigation.css?v=2">
+  <link rel="stylesheet" href="./assets/navigation.css?v=3">
   <link rel="stylesheet" href="./assets/study-home.css?v=3">
   <link rel="stylesheet" href="./assets/sentences.css?v=2">
   <script src="./assets/config.js?v=3" defer></script>
-  <script type="module" src="./assets/app.js?v=35"></script>
+  <script type="module" src="./assets/app.js?v=36"></script>
 </head>
 <body data-view="home">
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -43,27 +43,6 @@
       <article id="flashcard" class="flashcard" aria-label="演習カード" aria-busy="true"><div class="loading-state">読み込み中…</div></article>
     </div>
   </section>
-  <div class="workspace-controls" role="group" aria-label="演習メニュー" hidden>
-    <div class="mode-toolbar">
-      <div class="mode-switch" role="group" aria-label="演習モード">
-        <button data-mode="read" aria-pressed="false"><span data-icon="book"></span><span class="mode-copy"><strong id="read-mode-label">읽기（한→漢）</strong></span></button>
-        <button data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>
-      </div>
-      <div class="practice-tools">
-        <div class="practice-type-switch" role="group" aria-label="通常演習と復習の切り替え">
-          <button type="button" data-practice-type="practice" aria-pressed="true">通常演習</button>
-          <button type="button" data-practice-type="review" aria-pressed="false">復習</button>
-        </div>
-        <button id="open-settings" class="settings-button" aria-haspopup="dialog" aria-label="この教材の設定" title="この教材の設定"><span data-icon="sliders"></span><span>個別設定</span></button>
-      </div>
-    </div>
-    <nav class="main-nav" aria-label="メインメニュー">
-      <button class="nav-item" data-view="home"><span data-icon="layers"></span>セット</button>
-      <button class="nav-item active" data-view="study"><span data-icon="cards"></span>演習</button>
-      <button class="nav-item" data-view="library"><span data-icon="grid"></span>一覧<span id="nav-count" class="nav-count"></span></button>
-      <button class="nav-item" data-view="progress"><span data-icon="chart"></span>記録</button>
-    </nav>
-  </div>
   <section id="library-view" class="view" hidden>
     <div class="page-heading"><h1 id="library-title">カード一覧</h1><span><strong id="library-total">—</strong>枚</span></div>
     <div id="rank-filters" class="status-filters" aria-label="評価で絞り込み"></div>
@@ -86,6 +65,28 @@
   <div class="dialog-heading"><h2 id="settings-title">出題設定</h2><button id="close-settings" class="icon-button" aria-label="閉じる">×</button></div>
   <form id="settings-form">
     <div class="settings-content">
+  <div class="workspace-controls" role="group" aria-label="演習メニュー">
+    <strong id="settings-course-label" class="settings-course-label">한漢</strong>
+    <div class="mode-toolbar">
+      <div class="mode-switch" role="group" aria-label="演習モード">
+        <button type="button" data-mode="read" aria-pressed="false"><span data-icon="book"></span><span class="mode-copy"><strong id="read-mode-label">읽기（한→漢）</strong></span></button>
+        <button type="button" data-mode="write" aria-pressed="true"><span data-icon="pen"></span><span class="mode-copy"><strong id="write-mode-label">쓰기（漢→한）</strong></span></button>
+      </div>
+      <div class="practice-tools">
+        <div class="practice-type-switch" role="group" aria-label="通常演習と復習の切り替え">
+          <button type="button" data-practice-type="practice" aria-pressed="true">通常演習</button>
+          <button type="button" data-practice-type="review" aria-pressed="false">復習</button>
+        </div>
+      </div>
+    </div>
+    <nav class="main-nav" aria-label="メインメニュー">
+      <button type="button" class="nav-item" data-view="home"><span data-icon="layers"></span>セット</button>
+      <button type="button" class="nav-item active" data-view="study"><span data-icon="cards"></span>演習</button>
+      <button type="button" class="nav-item" data-view="library"><span data-icon="grid"></span>一覧<span id="nav-count" class="nav-count"></span></button>
+      <button type="button" class="nav-item" data-view="progress"><span data-icon="chart"></span>記録</button>
+    </nav>
+  </div>
+
       <div id="settings-target" class="settings-target" role="group" aria-label="設定の適用先"><button type="button" data-settings-target="common" aria-pressed="true">すべて共通</button><button type="button" data-settings-target="course" aria-pressed="false">この教材のみ</button></div>
       <section id="settings-normal-presets" class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
       <section id="settings-scope-section" class="settings-section"><h3>出題範囲</h3><div id="settings-scope" class="choice-row" role="group" aria-label="出題範囲"></div></section>
