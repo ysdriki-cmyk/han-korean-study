@@ -1,5 +1,5 @@
-.flashcard .question-word.sentence-question { max-width: 100%; font-size: clamp(20px, 3.5vw, 30px); line-height: 1.85; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
-.flashcard[data-mode=write] .sentence-question { font-size: clamp(18px, 3vw, 25px); }
+/* Override the large single-word reading rules in review.css in both directions. */
+.flashcard[data-mode] .question-word.sentence-question { max-width: 100%; font-size: clamp(16px, 2.6vw, 22px); line-height: 1.65; font-weight: 500; white-space: pre-wrap; overflow-wrap: anywhere; }
 .flashcard[data-mode=write] .write-form textarea { display: block; width: 100%; min-height: 112px; padding: 14px 16px; border: 1px solid #cbd9ed; border-radius: 10px; background: #fcfdff; color: #263348; font: inherit; font-size: 19px; line-height: 1.75; resize: vertical; }
 .flashcard[data-mode=write] .write-form textarea:focus { outline: 2px solid #84b4f4; outline-offset: 2px; }
 .sentence-answer .answer-value.hangul { font-size: clamp(20px, 3vw, 27px); line-height: 1.8; }
