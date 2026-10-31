@@ -22,11 +22,12 @@ function highlight(value, query) {
 }
 function exampleTable(entries, query, showSentences) {
   const rows = entries.map((entry, index) => {
-    const expandable = !showSentences && Boolean(entry.exampleKo || entry.exampleJa);
+    const hasSentence = Boolean(entry.exampleKo || entry.exampleJa);
+    const expandable = !showSentences && hasSentence;
     const exampleId = `usage-example-${index}`;
     const word = expandable ? `<button type="button" class="usage-word-toggle" data-usage-toggle aria-expanded="false" aria-controls="${exampleId}" aria-label="${esc(entry.korean)}の例文を開閉">${highlight(entry.korean, query)}</button>` : `<span>${highlight(entry.korean, query)}</span>`;
-    const sentence = expandable ? `<tr id="${exampleId}" class="usage-example-row" hidden><td colspan="3"><div class="usage-example-content">${entry.exampleKo ? `<p class="usage-sentence" lang="ko"><small class="usage-sentence-label" lang="ja">例文</small>${highlight(entry.exampleKo, query)}${speechButton(entry.exampleKo)}</p>` : ''}${entry.exampleJa ? `<p class="usage-sentence" lang="ja"><small class="usage-sentence-label">日本語訳</small>${esc(entry.exampleJa)}</p>` : ''}</div></td></tr>` : '';
-    return `<tbody><tr${expandable ? ' class="usage-expandable" data-usage-example-row' : ''}><th scope="row" class="usage-word" lang="ko">${word}${speechButton(entry.korean)}${showSentences && entry.exampleKo ? `<p class="usage-sentence"><small class="usage-sentence-label">例文</small>${highlight(entry.exampleKo, query)}${speechButton(entry.exampleKo)}</p>` : ''}</th><td lang="en">${esc(entry.english) || '<span class="usage-missing" aria-label="未記入">—</span>'}</td><td lang="ja"><span>${esc(entry.japanese) || '<span class="usage-missing" aria-label="未記入">—</span>'}</span>${showSentences && entry.exampleJa ? `<p class="usage-sentence"><small class="usage-sentence-label">例文訳</small>${esc(entry.exampleJa)}</p>` : ''}</td></tr>${sentence}</tbody>`;
+    const sentence = hasSentence ? `<tr id="${exampleId}" class="usage-example-row"${expandable ? ' hidden' : ''}><td colspan="3"><div class="usage-example-content">${entry.exampleKo ? `<p class="usage-sentence" lang="ko"><small class="usage-sentence-label" lang="ja">例文</small>${highlight(entry.exampleKo, query)}${speechButton(entry.exampleKo)}</p>` : ''}${entry.exampleJa ? `<p class="usage-sentence" lang="ja"><small class="usage-sentence-label">日本語訳</small>${esc(entry.exampleJa)}</p>` : ''}</div></td></tr>` : '';
+    return `<tbody><tr${expandable ? ' class="usage-expandable" data-usage-example-row' : ''}><th scope="row" class="usage-word" lang="ko">${word}${speechButton(entry.korean)}</th><td lang="en">${esc(entry.english) || '<span class="usage-missing" aria-label="未記入">—</span>'}</td><td lang="ja"><span>${esc(entry.japanese) || '<span class="usage-missing" aria-label="未記入">—</span>'}</span></td></tr>${sentence}</tbody>`;
   }).join('');
   return `<div class="usage-table-wrap"><table class="usage-table"><caption class="sr-only">TOPIK1 使用参考例</caption><colgroup><col><col><col></colgroup><thead><tr><th scope="col">韓国単語</th><th scope="col">英語</th><th scope="col">日本語</th></tr></thead>${rows}</table></div>`;
 }
