@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="./assets/topik.css?v=10">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
   <link rel="stylesheet" href="./assets/navigation.css?v=3">
-  <link rel="stylesheet" href="./assets/study-home.css?v=3">
+  <link rel="stylesheet" href="./assets/study-home.css?v=4">
   <link rel="stylesheet" href="./assets/sentences.css?v=2">
   <link rel="stylesheet" href="./assets/library.css?v=1">
   <script src="./assets/config.js?v=3" defer></script>
@@ -33,7 +33,6 @@
   <section id="home-view" class="view study-home"><h1 class="sr-only">ホーム</h1><p class="loading-state">読み込み中…</p></section>
   <section id="study-view" class="view" hidden>
     <h1 class="sr-only">演習</h1>
-    <div class="study-set-context"><button type="button" data-view="home">← セット一覧</button><span id="active-set-label"></span></div>
     <div class="practice-stage">
       <div class="session-bar" aria-label="演習の進捗">
         <span class="session-count"><span class="session-label">進捗</span><strong id="session-done">0</strong><span class="session-divider">/</span><span id="session-total">10</span></span>
@@ -43,6 +42,7 @@
       </div>
       <article id="flashcard" class="flashcard" aria-label="演習カード" aria-busy="true"><div class="loading-state">読み込み中…</div></article>
     </div>
+    <div class="study-set-context"><button type="button" data-view="home">← セット一覧</button><span id="active-set-label"></span></div>
   </section>
   <section id="library-view" class="view" hidden>
     <div class="page-heading"><h1 id="library-title">カード一覧</h1><span><strong id="library-total">—</strong>枚</span></div>

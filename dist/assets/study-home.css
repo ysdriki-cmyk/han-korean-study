@@ -11,7 +11,7 @@
 }
 body[data-view=home] .workspace-controls { display: none; }
 .study-home > .study-home { padding: 0; }
-.study-set-context { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; min-width: 0; margin: 0 0 14px; color: #758196; font-size: 12px; }
+.study-set-context { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 16px; min-width: 0; margin: 14px 0 0; color: #758196; font-size: 12px; }
 .study-set-context button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 35px; padding: 6px 10px; border: 1px solid #dce4ef; border-radius: 7px; background: white; color: #66758b; font-size: 12px; font-weight: 500; }
 .study-set-context button:hover { color: #2871d5; border-color: #b4cdef; background: #f8fbff; }
 .study-set-context > span { min-width: 0; overflow-wrap: anywhere; }
@@ -110,7 +110,7 @@ body[data-view=home] .workspace-controls { display: none; }
   .study-home .home-set-percent { min-width: 64px; gap: 4px; }
 }
 @media (max-width: 600px) {
-  .study-set-context { gap: 7px 11px; margin-bottom: 11px; font-size: 11px; }
+  .study-set-context { gap: 7px 11px; margin: 11px 0 0; font-size: 11px; }
   .study-set-context button { min-height: 34px; padding: 6px 9px; font-size: 11px; }
   .study-home { padding-top: 0; }
   .study-home .home-resume { gap: 8px; font-size: 11px; }
