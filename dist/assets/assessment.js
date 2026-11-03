@@ -10,12 +10,18 @@ export const RATINGS = Object.freeze([
 ].map(Object.freeze));
 export const UNSEEN = Object.freeze({ id: 'unseen', symbol: 'ー', label: '未回答' });
 
-/** Grade writing independently of the card's status in another mode or deck. */
-export function writingAssessment(previousRating, correct) {
-  if (correct === null) return UNSEEN.id;
-  if (correct === false) return 'again';
-  if (correct !== true) throw new TypeError('採点結果はtrue、false、nullで指定してください。');
-  return previousRating === 'good' || previousRating === 'solid' ? 'solid' : 'good';
+/** Correct input selects good; unsuccessful repeat attempts keep the existing status. */
+export function defaultAssessmentRating(previousRating, correct, { mode = 'read', hasPrevious = previousRating !== UNSEEN.id } = {}) {
+  if (!MODES.has(mode)) throw new RangeError('演習モードが正しくありません。');
+  if (!RATING_IDS.has(previousRating)) throw new RangeError('評価が正しくありません。');
+  if (correct !== null && typeof correct !== 'boolean') throw new TypeError('採点結果はtrue、false、nullで指定してください。');
+  if (correct === true) return 'good';
+  if (hasPrevious) return previousRating;
+  return correct === false ? 'again' : mode === 'read' ? 'unsure' : UNSEEN.id;
+}
+
+export function writingAssessment(previousRating, correct, options = {}) {
+  return defaultAssessmentRating(previousRating, correct, { ...options, mode: 'write' });
 }
 
 const RATING_IDS = new Set([...RATINGS.map(item => item.id), UNSEEN.id]);
@@ -58,7 +64,7 @@ export function ratingFor(card, records = {}, mode = 'read') {
  * Append one actual attempt. A post-grading self-rating uses countAttempt:false
  * to revise only the latest rating, retaining its objective result and time.
  */
-export function recordAssessment(record, mode, rating, { correct = null, now, countAttempt = true } = {}) {
+export function recordAssessment(record, mode, rating, { correct = null, now, countAttempt = true, ratingRetained = false } = {}) {
   if (!MODES.has(mode)) throw new RangeError('演習モードが正しくありません。');
   if (!RATING_IDS.has(rating)) throw new RangeError('評価が正しくありません。');
   if (correct !== null && typeof correct !== 'boolean') throw new TypeError('採点結果はtrue、false、nullで指定してください。');
@@ -72,9 +78,10 @@ export function recordAssessment(record, mode, rating, { correct = null, now, co
     current.correct += Number(correct === true);
     current.wrong += Number(correct === false);
     current.lastAt = at;
-    current.history.push({ rating, correct, at });
+    current.history.push({ rating, correct, at, ...(ratingRetained ? { ratingRetained: true } : {}) });
   } else if (current.history.length) {
-    current.history[current.history.length - 1] = { ...current.history.at(-1), rating };
+    const { ratingRetained: retained, ...event } = current.history.at(-1);
+    current.history[current.history.length - 1] = { ...event, rating };
   }
   assessments[mode] = current;
   return { ...source, assessments, updatedAt: at };
@@ -104,7 +111,7 @@ export function filterAssessments(cards, records = {}, settings = {}, now = Date
       const history = object(object(record.assessments)[selectedMode]).history;
       const hasMistake = Array.isArray(history) && history.some(event => {
         const item = object(event), at = timestamp(item.at);
-        return (item.correct === false || ['hard', 'again'].includes(item.rating))
+        return (item.correct === false || (!item.ratingRetained && ['hard', 'again'].includes(item.rating)))
           && at !== null && at >= nowTime - mistakeDays * DAY && at <= nowTime;
       });
       if (!hasMistake) return false;

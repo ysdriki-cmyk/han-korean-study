@@ -19,15 +19,15 @@ function requireMode(mode) {
 /** A graded miss is still a miss when the learner chooses a confident rating. */
 function successful(event) {
   const source = object(event);
-  return source.correct !== false && ['good', 'solid'].includes(source.rating);
+  return !source.ratingRetained && source.correct !== false && ['good', 'solid'].includes(source.rating);
 }
 function mistakeReviewAt(assessment) {
   const source = object(assessment);
   const history = Array.isArray(source.history) ? source.history : [];
-  const mistakes = history.filter(event => object(event).correct === false || ['hard', 'again'].includes(object(event).rating))
+  const mistakes = history.filter(event => object(event).correct === false || (!object(event).ratingRetained && ['hard', 'again'].includes(object(event).rating)))
     .map(event => timestamp(object(event).at)).filter(at => at !== null);
   // Older records may have a rating and timestamp without an event history.
-  if (['hard', 'again'].includes(source.rating) && timestamp(source.lastAt) !== null) mistakes.push(timestamp(source.lastAt));
+  if (!object(history.at(-1)).ratingRetained && ['hard', 'again'].includes(source.rating) && timestamp(source.lastAt) !== null) mistakes.push(timestamp(source.lastAt));
   return mistakes.length ? Math.max(...mistakes) + MISTAKE_INTERVAL_DAYS * DAY : null;
 }
 function withMistakeInterval(schedule, assessment) {

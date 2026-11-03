@@ -1,8 +1,8 @@
 import { RANKS, getRecord } from './learning.js';
 import { makeSession } from './core.js';
-import { RATINGS, filterAssessments } from './assessment.js';
+import { RATINGS, filterAssessments, ratingFor, defaultAssessmentRating } from './assessment.js?v=3';
 import { essentialKanji } from './kanji.js';
-import { reviewDue } from './review.js?v=3';
+import { reviewDue } from './review.js?v=4';
 
 const FILTERS = new Set(['all', 'review', ...RANKS.map(rank => rank.id)]);
 const RATING_IDS = [...RATINGS.map(item => item.id), 'unseen'];
@@ -23,6 +23,17 @@ export function practiceCount(card, records = {}, mode = 'read') {
   const history = Array.isArray(assessment.history) ? assessment.history : [];
   const recall = object(record.attempts[selected === 'write' ? 'han-ko' : 'ko-han']);
   return Math.max(count(assessment.attempts), history.length) + count(recall.right) + count(recall.wrong) + count(record[selected === 'write' ? 'writing' : 'reading'].attempts);
+}
+
+/** Prior attempts, imported statuses and explicit list edits all establish a default. */
+export function assessmentForAttempt(card, records, mode, correct) {
+  const previous = ratingFor(card, records, mode);
+  const assessment = getRecord(card, records).assessments?.[mode];
+  const hasPrevious = practiceCount(card, records, mode) > 0 || Boolean(assessment) || previous !== 'unseen';
+  return {
+    rating: defaultAssessmentRating(previous, correct, { mode, hasPrevious }),
+    ratingRetained: hasPrevious && correct !== true,
+  };
 }
 
 /** Source ranks and future due dates never invent a recent practice event. */

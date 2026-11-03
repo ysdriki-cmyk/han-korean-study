@@ -27,31 +27,31 @@ test('five symbol ratings and unseen state preserve legacy progress per mode', (
   assert.equal(ratingFor(card, { [card.id]: { rank: 'manji', writing: { attempts: 1 } } }, 'write'), 'again');
 });
 
-test('correct writing becomes good, then solid only from a prior good or solid status', () => {
+test('correct writing selects good and unsuccessful attempts preserve an existing status', () => {
   for (const previous of ['unseen', 'hard', 'again', 'unsure']) {
     assert.equal(writingAssessment(previous, true), 'good');
   }
-  assert.equal(writingAssessment('good', true), 'solid');
-  assert.equal(writingAssessment('solid', true), 'solid');
+  assert.equal(writingAssessment('good', true), 'good');
+  assert.equal(writingAssessment('solid', true), 'good');
   for (const previous of [...RATINGS.map(item => item.id), UNSEEN.id]) {
-    assert.equal(writingAssessment(previous, false), 'again');
-    assert.equal(writingAssessment(previous, null), 'unseen');
+    assert.equal(writingAssessment(previous, false), previous === 'unseen' ? 'again' : previous);
+    assert.equal(writingAssessment(previous, null), previous);
   }
   assert.throws(() => writingAssessment('good', 'true'), /採点/);
 });
 
-test('empty writing is saved as unanswered without increasing wrong or correct counts', () => {
+test('empty repeated writing keeps its prior rating without increasing wrong or correct counts', () => {
   const correct = recordAssessment(getRecord(card), 'write', 'good', { correct: true, now: PREVIOUS });
   const blank = recordAssessment(correct, 'write', writingAssessment('good', null), { correct: null, now: NOW });
-  assert.equal(blank.assessments.write.rating, 'unseen');
+  assert.equal(blank.assessments.write.rating, 'good');
   assert.equal(blank.assessments.write.attempts, 2);
   assert.equal(blank.assessments.write.correct, 1);
   assert.equal(blank.assessments.write.wrong, 0);
-  assert.deepEqual(blank.assessments.write.history.at(-1), { rating: 'unseen', correct: null, at: NOW });
+  assert.deepEqual(blank.assessments.write.history.at(-1), { rating: 'good', correct: null, at: NOW });
   assert.equal(correct.assessments.write.rating, 'good');
 });
 
-test('writing promotion stays independent for both decks and both modes after saving', () => {
+test('writing defaults stay independent for both decks and both modes after saving', () => {
   const kanji = { id: 'kanji:1', han: '가', state: 'next' };
   const vocabulary = { id: 'vocabulary:1', han: '가', state: 'next' };
   let records = {
@@ -67,7 +67,7 @@ test('writing promotion stays independent for both decks and both modes after sa
   assert.equal(ratingFor(kanji, records, 'write'), 'good');
   assert.equal(ratingFor(vocabulary, records, 'write'), 'unseen');
   answer(kanji);
-  assert.equal(ratingFor(kanji, records, 'write'), 'solid');
+  assert.equal(ratingFor(kanji, records, 'write'), 'good');
   answer(vocabulary);
   assert.equal(ratingFor(vocabulary, records, 'write'), 'good');
   assert.equal(ratingFor(kanji, records, 'read'), 'solid');
