@@ -1,0 +1,9 @@
+# Always fetch the current entry page and the code that renders study answers.
+/
+  Cache-Control: no-store
+/index.html
+  Cache-Control: no-store
+/assets/app.js
+  Cache-Control: no-store
+/assets/topik-view.js
+  Cache-Control: no-store

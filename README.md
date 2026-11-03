@@ -8,6 +8,8 @@
 
 GitHubにはこのフォルダ全体を登録し、Cloudflare Pagesの公開先を `dist` にする。`functions/` は `dist/` の外に置く。兄弟フォルダの `Korea flash card/`、`archive/`、スクリーンショットは現在のアプリの配信には使わない。
 
+`dist/_headers`で入口HTMLと解答表示用JavaScriptを`Cache-Control: no-store`にし、更新時には読み込みURLの版番号も変更する。開いたままの画面は自動で差し替わらないため、更新確認にはページを読み直す。学習記録の保存領域は変更しない。
+
 最初の接続と運用手順は[GitHub・Cloudflareへの移行](cloudflare/MIGRATION.md)を参照する
 
 ## 教材
