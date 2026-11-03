@@ -68,6 +68,20 @@ test('answer combines unique nonempty source fields', () => {
   assert.equal(getAnswer({ kanji: ' 家 ', hanja: '家', meaning: 'いえ' }), '家\nいえ');
 });
 
+test('current one schema keeps characters separate from an optional empty hint', () => {
+  const {cards, warnings} = normalizeCards('id,韓国語,出題ヒント,漢字,解説・一覧,必須\n374,항,,行、港、航、恒,,！\n176,상,相,相、常,上、商、想,！');
+  assert.deepEqual(warnings, []);
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].kanji, '');
+  assert.equal(cards[0].hanja, '行、港、航、恒');
+  assert.equal(cards[1].kanji, '相');
+  assert.equal(cards[1].hanja, '相、常');
+  assert.equal(cards[1].meaning, '上、商、想');
+  const reordered = normalizeCards('漢字,出題ヒント,韓国語,id\n相、常,相,상,176').cards[0];
+  assert.equal(reordered.kanji, '相');
+  assert.equal(reordered.hanja, '相、常');
+});
+
 test('search, flags and recall status filter independently for both directions', () => {
   const { cards } = normalizeCards('id,Han,漢字,一覧,意味,flagged\n1,가,家,家,,true\n2,각,,角,,false\n3,개,,,犬,false');
   const progress = { [progressKey('1', 'ko-han')]: { status: 'mastered' }, [progressKey('2', 'ko-han')]: { status: 'review' } };

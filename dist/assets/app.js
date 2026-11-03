@@ -1,10 +1,10 @@
-import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=2';
+import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=3';
 import { sentencesFromVocabulary, matchSentenceAnswer } from './sentences.js';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
 import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
-import { renderTopikUsage, renderVocabularyExample } from './topik-view.js?v=9';
+import { renderTopikUsage, renderVocabularyExample } from './topik-view.js?v=10';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences, sharedPracticeSettings, applyPracticeSettings } from './practice.js?v=16';
@@ -17,6 +17,7 @@ import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
 import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=2';
 import { renderStudyHome } from './study-home.js?v=4';
 import { parseCategorySheet } from './category-sheet.js';
+import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -30,7 +31,7 @@ const ratingById = new Map(STATUSES.map(item => [item.id, item]));
 const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '完璧', unseen: '未回答' };
 let draftSettings = null;
 let settingsTarget = 'course', settingsDrafts = {};
-let topikExamples = [], topikState = 'loading';
+let topikExamples = [], topikState = 'loading', wordKanjiReferences = [];
 const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'home', activeDeck = 'kanji';
 let selectedSetIds = { kanji: 'essential', vocabulary: 'all', sentence: 'default:all' }, sheetSets = [], categorySheetText = '', sheetSetsLoaded = false;
@@ -251,7 +252,7 @@ function answerRows(card) {
   const otherHints = activeDeck === 'kanji' && settings.mode === 'write' ? answerFields(card, activeDeck).map(field => `<div class="answer-row"><span class="answer-label">${esc(field.label)}</span><p class="answer-value" lang="ja">${esc(field.text)}</p></div>`).join('') : '';
   const alternatives = activeDeck === 'kanji' && settings.mode === 'write' ? kanjiAnswersForPrompt(sessionCards, currentKanjiHint(card)).filter(answer => answer !== card.han) : [];
   const wordNotes = activeDeck === 'vocabulary'
-    ? [{label:'正解表記',text:card.answerVariants?.join('\n'),lang:'ko'}, {label:'類語',text:card.synonyms,lang:'ko'}, {label:'解説',text:card.notes,lang:'ja'}]
+    ? [{label:'正解表記',text:card.answerVariants?.join('\n'),lang:'ko'}, {label:'類語',text:card.synonyms,lang:'ko'}]
       .filter(field => field.text).map(field => `<div class="answer-row"><span class="answer-label">${field.label}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('')
     : '';
   const focusWord = activeDeck === 'sentence' && card.sourceWord ? `<section class="sentence-word"><h3>今回の単語</h3><div class="table-wrap"><table><thead><tr><th>韓国語</th><th>英語</th><th>日本語</th></tr></thead><tbody><tr><td lang="ko">${esc(card.sourceWord.han)}${speechButton(card.sourceWord.han)}</td><td lang="en">${esc(card.sourceWord.english || card.sourceWord.meaning || '—')}</td><td lang="ja">${esc(card.sourceWord.kanji || '—')}</td></tr></tbody></table></div></section>` : '';
@@ -312,7 +313,7 @@ function renderCard() {
   actions += cardNavigation();
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label>${activeDeck === 'sentence' ? `<textarea id="hangul-input" rows="3" placeholder="韓国語の例文を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(submitted)}</textarea>` : `<input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}">`}</form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
+  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card, findWordKanjiReferences(wordKanjiReferences, card.han)) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
@@ -420,6 +421,9 @@ function filteredLibrary(id) { rankFilter = id; page = 0; selected.clear(); rend
 function courseConfig(id) {
   const course = config.decks?.[id] || {};
   return { csvUrl: course.csvUrl || (id === 'kanji' ? config.csvUrl : '') || '', fallbackCsvUrl: course.fallbackCsvUrl || (id === 'kanji' ? config.fallbackCsvUrl : '') || getDeck(id).path };
+}
+function updateWordKanjiReferences() {
+  wordKanjiReferences = parseWordKanjiReferences(deckData.get('kanji')?.text || '');
 }
 function updateSentenceDeck() {
   const vocabulary = deckData.get('vocabulary');
@@ -575,6 +579,7 @@ async function refreshRemote() {
       if (contentChanged) {
         changed = true;
         if (deck.id === activeDeck) cards = result.cards;
+        if (deck.id === 'kanji') referencesChanged = true;
         if (deck.id === 'vocabulary' && config.referencesFromVocabulary) {
           topikExamples = examplesFromVocabulary(result.cards); topikState = 'ready'; referencesChanged = true;
         }
@@ -582,7 +587,7 @@ async function refreshRemote() {
     });
     const categoriesChanged = await categoryTask;
     if (changed || categoriesChanged) {
-      updateSentenceDeck();
+      updateSentenceDeck(); updateWordKanjiReferences();
       updateCourseChrome(); renderOverview(); renderLibrary();
       if (revealed && referencesChanged) renderCard();
     }
@@ -743,7 +748,7 @@ async function init() {
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
   const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets()]);
   results.slice(0, SOURCE_DECKS.length).forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(SOURCE_DECKS[index].id, result.value); });
-  updateSentenceDeck();
+  updateSentenceDeck(); updateWordKanjiReferences();
   // A live word snapshot supplies its own references; bundled decks retain the legacy fallback.
   loadTopikExamples().then(examples => { topikExamples = examples; topikState = 'ready'; })
     .catch(() => { topikState = 'error'; })

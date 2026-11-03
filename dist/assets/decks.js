@@ -1,4 +1,4 @@
-import {normalizeCards} from './core.js';
+import {normalizeCards} from './core.js?v=2';
 import {normalizeVocabulary} from './vocabulary.js';
 import {getRecord, migrateLegacy} from './learning.js';
 import {normalizeSentences} from './sentences.js';

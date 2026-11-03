@@ -79,6 +79,12 @@ export function normalizeCards(text) {
     flagged: findColumn('flagged', 'flag', '重点'),
     essential: findColumn('必須', 'essential'),
   };
+  // In the current one sheet, optional hints and the actual characters are separate.
+  const explicitHint = findColumn('出題ヒント'), characters = findColumn('漢字');
+  if (explicitHint >= 0 && characters >= 0) {
+    column.kanji = explicitHint;
+    if (column.hanja < 0) column.hanja = characters;
+  }
   const legacy = headers.length === 10 && column.han === 4 && column.kanji === 5 && column.hanja === 8;
   if (legacy && column.meaning < 0) column.meaning = 9;
   if (legacy && column.flagged < 0) column.flagged = 0;
