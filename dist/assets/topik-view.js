@@ -24,7 +24,7 @@ function highlight(value, query) {
 /** The word and translations are already shown in the answer above. */
 export function renderVocabularyExample(card, kanjiReferences = []) {
   if (!card.exampleKo && !card.exampleJp && !kanjiReferences.length) return '';
-  const correspondence = kanjiReferences.length ? `<div class="word-kanji-reference"><table class="word-kanji-table"><caption class="sr-only">one 韓国語と漢字の対応</caption><thead><tr><th scope="col">韓国語</th><th scope="col">漢字</th></tr></thead><tbody>${kanjiReferences.map(entry => `<tr><th scope="row" lang="ko">${esc(entry.korean)}${speechButton(entry.korean)}</th><td lang="ja">${esc(entry.kanji)}</td></tr>`).join('')}</tbody></table></div>` : '';
+  const correspondence = kanjiReferences.length ? `<p class="word-kanji-reference" aria-label="漢字の対応">${kanjiReferences.map(entry => `<button type="button" class="word-kanji-piece" data-speak="${esc(entry.korean)}" aria-label="${esc(entry.korean)}を読み上げ" aria-pressed="false" title="読み上げ"><span lang="ko">${esc(entry.korean)}</span><span lang="ja">(${esc(entry.kanji.replace(/\s*\r?\n\s*/gu, '、'))})</span></button>`).join(' <span class="word-kanji-plus" aria-hidden="true">＋</span> ')}</p>` : '';
   return `<section class="usage-reference vocabulary-example" aria-label="${kanjiReferences.length ? '例文と漢字の対応' : '例文'}">${card.exampleKo ? `<p class="usage-sentence" lang="ko"><small class="usage-sentence-label" lang="ja">例文</small>${esc(card.exampleKo)}${speechButton(card.exampleKo)}</p>` : ''}${card.exampleJp ? `<p class="usage-sentence" lang="ja"><small class="usage-sentence-label">日本語訳</small>${esc(card.exampleJp)}</p>` : ''}${correspondence}</section>`;
 }
 

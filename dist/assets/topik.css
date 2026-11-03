@@ -203,16 +203,12 @@
   color: #667085;
   font-size: 14px;
 }
-.word-kanji-reference { margin-top: 22px; overflow: hidden; border: 1px solid #dfe5ed; border-radius: 9px; }
+.word-kanji-reference { margin: 12px 0 0; color: #667085; font-size: 13px; line-height: 1.9; overflow-wrap: anywhere; }
 .word-kanji-reference:first-child { margin-top: 0; }
-.word-kanji-table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; }
-.word-kanji-table th, .word-kanji-table td { padding: 11px 14px; vertical-align: top; overflow-wrap: anywhere; }
-.word-kanji-table thead th { background: #f7f9fc; color: #667085; font-size: 12px; font-weight: 500; }
-.word-kanji-table thead th:first-child { width: 30%; }
-.word-kanji-table tbody th { font-size: 16px; font-weight: 500; }
-.word-kanji-table tbody td { font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
-.word-kanji-table tbody tr > * { border-top: 1px solid #e8edf3; }
-.word-kanji-table .speech-button { margin: 0 0 0 5px; }
+.word-kanji-piece { max-width: 100%; padding: 1px 0; border-radius: 3px; color: inherit; font: inherit; text-align: left; vertical-align: baseline; white-space: normal; overflow-wrap: anywhere; }
+.word-kanji-piece [lang=ko] { color: #526075; font-weight: 600; }
+.word-kanji-piece:hover, .word-kanji-piece[aria-pressed=true] { color: #2269cc; background: #edf5ff; }
+.word-kanji-plus { margin: 0 3px; color: #8a95a5; }
 @media(max-width:720px) {
  .usage-compact .usage-table th,
  .usage-compact .usage-table td { padding-top: 8px; padding-bottom: 8px; }

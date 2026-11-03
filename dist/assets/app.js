@@ -4,7 +4,7 @@ import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
 import { recordContentDiagnostics } from './content-diagnostics.js?v=2';
-import { renderTopikUsage, renderVocabularyExample } from './topik-view.js?v=10';
+import { renderTopikUsage, renderVocabularyExample } from './topik-view.js?v=11';
 import { getRecord, matchHangul } from './learning.js';
 import { RATINGS, UNSEEN, ratingFor, recordAssessment, writingAssessment } from './assessment.js?v=2';
 import { practiceSettings, practicePool, makePracticeSession, restorePracticePreferences, sharedPracticeSettings, applyPracticeSettings } from './practice.js?v=16';

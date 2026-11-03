@@ -29,15 +29,16 @@ test('reordered headers and decomposed Korean work without falling back to expla
   assert.deepEqual(parseWordKanjiReferences('韓国語,漢字候補,漢字\n상,別の候補,常'), [{korean:'상',kanji:'常'}]);
 });
 
-test('two-column correspondences follow the translation and omit old notes', () => {
+test('compact correspondences follow the translation and omit headers and old notes', () => {
   const html = renderVocabularyExample({exampleKo:'항상 말하잖아요',exampleJp:'いつも言ってるじゃないですか',notes:'古い説明'}, [
     {korean:'항',kanji:'行、港、航、恒'}, {korean:'상',kanji:'相、常 <script>'},
   ]);
-  assert.ok(html.includes('<th scope="col">韓国語</th><th scope="col">漢字</th>'));
-  assert.equal((html.match(/scope="row"/g)||[]).length, 2);
+  assert.equal((html.match(/class="word-kanji-piece"/g)||[]).length, 2);
+  assert.equal((html.match(/class="word-kanji-plus"/g)||[]).length, 1);
+  assert.ok(html.includes('aria-label="항を読み上げ"'));
   assert.ok(html.indexOf('いつも言ってるじゃないですか') < html.indexOf('word-kanji-reference'));
   assert.ok(html.includes('相、常 &lt;script&gt;'));
-  for (const hidden of ['<script>', '古い説明', '解説・一覧', 'TOPIK1', '英語</th>', '日本語</th>']) assert.ok(!html.includes(hidden));
-  assert.ok(renderVocabularyExample({}, [{korean:'항',kanji:'恒'}]).includes('word-kanji-table'));
+  for (const hidden of ['<table', '<script>', '古い説明', '解説・一覧', 'TOPIK1', '韓国語</th>', '漢字</th>']) assert.ok(!html.includes(hidden));
+  assert.ok(renderVocabularyExample({}, [{korean:'항',kanji:'恒'}]).includes('word-kanji-reference'));
   assert.equal(renderVocabularyExample({}), '');
 });
