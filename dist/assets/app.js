@@ -18,6 +18,7 @@ import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } fr
 import { renderStudyHome } from './study-home.js?v=4';
 import { parseCategorySheet } from './category-sheet.js';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
+import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
@@ -29,7 +30,7 @@ const SET_PREF_KEY = 'han-hanja:study-sets:v1';
 const STATUSES = [...RATINGS, UNSEEN];
 const ratingById = new Map(STATUSES.map(item => [item.id, item]));
 const ratingLabels = { hard: '全然', again: 'もう一度', unsure: 'あいまい', good: 'できた', solid: '完璧', unseen: '未回答' };
-let draftSettings = null;
+let draftSettings = null, bulkRatingDraft = null, lastBulkRatingEdit = null;
 let settingsTarget = 'course', settingsDrafts = {};
 let topikExamples = [], topikState = 'loading', wordKanjiReferences = [];
 const pageSize = 30;
@@ -305,7 +306,7 @@ function renderCard() {
   }
   if (position >= session.length) { renderComplete(el); return; }
   const card = session[position], writing = settings.mode === 'write';
-  const selectedRating = answers.get(position)?.rating;
+  const selectedRating = answers.has(position) ? rank(card) : undefined;
   let actions;
   if (writing && !revealed) actions = '<button type="submit" form="write-form" class="reveal-button" id="check-writing">答えを見る・採点</button>';
   else if (!revealed) actions = '<button id="reveal-card" class="reveal-button" data-action="reveal">答えを見る</button>';
@@ -369,6 +370,7 @@ function previous() {
 function setView(next, { hash = true } = {}) {
   speaker.stop();
   if ($('#practice-settings').open) $('#practice-settings').close();
+  if ($('#bulk-rating-dialog').open) $('#bulk-rating-dialog').close();
   if (view === 'study' && next !== 'study' && loaded && session[position]) saveCardView();
   view = ['home', 'study', 'library', 'progress'].includes(next) ? next : 'home';
   document.body.dataset.view = view;
@@ -406,8 +408,49 @@ function renderLibrary() {
 function updateSelection() {
   const present = new Set(studyCards().map(card => card.id)); selected = new Set([...selected].filter(id => present.has(id)));
   $('#selection-count').textContent = `${selected.size}枚選択`; $('#queue-selected').disabled = !selected.size;
+  $('#open-bulk-rating').disabled = !selected.size; $('#clear-selection').disabled = !selected.size;
+  $('#undo-bulk-rating').hidden = !lastBulkRatingEdit || lastBulkRatingEdit.deckId !== activeDeck || lastBulkRatingEdit.mode !== settings.mode;
   $('#select-page').checked = !!pageCards.length && pageCards.every(card => selected.has(card.id));
   $('#select-page').indeterminate = pageCards.some(card => selected.has(card.id)) && !$('#select-page').checked;
+}
+function renderBulkRating() {
+  if (!bulkRatingDraft) return;
+  const { ids, mode, rating } = bulkRatingDraft;
+  $('#bulk-rating-context').textContent = `${activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label} · ${mode === 'read' ? '읽기' : '쓰기'} · ${ids.size}枚`;
+  $('#bulk-rating-options').innerHTML = STATUSES.map(item => `<button type="button" class="rating-choice rating-${item.id}" data-bulk-rating="${item.id}" aria-label="${esc(item.symbol)} ${ratingLabels[item.id]}" aria-pressed="${rating === item.id}"><span class="rating-symbol">${item.symbol}</span><span class="rating-label">${ratingLabels[item.id]}</span></button>`).join('');
+  $('#apply-bulk-rating').disabled = !rating;
+  $('#apply-bulk-rating').textContent = `${ids.size}枚を変更`;
+}
+function openBulkRating() {
+  updateSelection();
+  if (!selected.size) return;
+  speaker.stop();
+  $('#bulk-rating-error').hidden = true;
+  bulkRatingDraft = { ids: new Set(selected), deckId: activeDeck, mode: settings.mode, rating: null };
+  renderBulkRating(); $('#bulk-rating-dialog').showModal();
+}
+function commitBulkRating() {
+  const draft = bulkRatingDraft;
+  if (!draft?.rating || draft.deckId !== activeDeck || draft.mode !== settings.mode) return;
+  const result = applyBulkRating(studyCards(), records, draft.ids, draft.mode, draft.rating);
+  if (!result.edits.length) { $('#bulk-rating-dialog').close(); return; }
+  if (!safeWrite(RECORD_KEY, { version: 3, records: result.records })) {
+    $('#bulk-rating-error').textContent = 'ステータスを保存できませんでした。変更は適用していません。';
+    $('#bulk-rating-error').hidden = false; return;
+  }
+  records = result.records;
+  lastBulkRatingEdit = { deckId: activeDeck, mode: settings.mode, edits: result.edits };
+  selected.clear(); $('#bulk-rating-dialog').close();
+  renderOverview(); renderLibrary();
+  toast(`${result.edits.length}枚を${ratingById.get(draft.rating).symbol} ${ratingLabels[draft.rating]}に変更しました`);
+}
+function revertBulkRating() {
+  if (!lastBulkRatingEdit || lastBulkRatingEdit.deckId !== activeDeck || lastBulkRatingEdit.mode !== settings.mode) return;
+  const result = undoBulkRating(records, lastBulkRatingEdit.edits);
+  if (!safeWrite(RECORD_KEY, { version: 3, records: result.records })) { toast('変更を元に戻せませんでした', true); return; }
+  records = result.records; lastBulkRatingEdit = null;
+  renderOverview(); renderLibrary();
+  toast(result.restored ? `${result.restored}枚の変更を元に戻しました` : '変更後に演習・編集したカードはそのまま残しました');
 }
 function practiceSelected(ids) {
   const selectedCards = studyCards().filter(card => ids.has(card.id)); if (!selectedCards.length) return;
@@ -644,6 +687,10 @@ function bind() {
     if (target.hasAttribute('data-set-group')) { homeGroup = target.dataset.setGroup; renderHome(); return; }
     if (target.hasAttribute('data-resume-study')) { setView('study'); speakQuestion(); return; }
     if (target.dataset.speak) { speaker.toggle(target.dataset.speak); return; }
+    if (target.dataset.bulkRating && bulkRatingDraft) {
+      bulkRatingDraft.rating = target.dataset.bulkRating; renderBulkRating();
+      $(`[data-bulk-rating="${bulkRatingDraft.rating}"]`)?.focus({ preventScroll: true }); return;
+    }
     if (target.closest('#practice-settings') && (target.dataset.practiceType || target.dataset.mode || target.dataset.view)) $('#practice-settings').close();
     if (target.dataset.practiceType && loaded) switchPracticeType(target.dataset.practiceType);
     if (target.dataset.mode && loaded) switchMode(target.dataset.mode);
@@ -725,12 +772,18 @@ function bind() {
   };
   $('#select-page').onchange = event => { pageCards.forEach(card => { if (event.target.checked) selected.add(card.id); else selected.delete(card.id); }); renderLibrary(); };
   $('#queue-selected').onclick = () => practiceSelected(new Set(selected));
+  $('#clear-selection').onclick = () => { selected.clear(); renderLibrary(); };
+  $('#open-bulk-rating').onclick = openBulkRating;
+  $('#apply-bulk-rating').onclick = commitBulkRating;
+  $('#undo-bulk-rating').onclick = revertBulkRating;
+  $('#close-bulk-rating').onclick = $('#cancel-bulk-rating').onclick = () => $('#bulk-rating-dialog').close();
+  $('#bulk-rating-dialog').addEventListener('close', () => { bulkRatingDraft = null; });
   $('#prev-page').onclick = () => { page -= 1; renderLibrary(); }; $('#next-page').onclick = () => { page += 1; renderLibrary(); };
   window.addEventListener('pagehide', () => speaker.stop());
   document.addEventListener('visibilitychange', () => { if (document.hidden) speaker.stop(); else if (loaded) refreshRemote(); });
   window.addEventListener('hashchange', () => setView(location.hash.slice(1), { hash: false }));
   document.addEventListener('keydown', event => {
-    if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open) return;
+    if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open || $('#bulk-rating-dialog').open) return;
     const target = event.target; if (target.closest('input,select,textarea,[contenteditable=true]')) return;
     if (event.code === 'Space' && !revealed && (!target.closest('button,a') || target.closest('#reveal-card'))) { event.preventDefault(); reveal(); }
     else if (revealed && /^[1-6]$/.test(event.key)) { event.preventDefault(); rateCard(STATUSES[Number(event.key) - 1].id); }

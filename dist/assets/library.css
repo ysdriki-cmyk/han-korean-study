@@ -1,0 +1,16 @@
+.selection-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.selection-actions .button { min-height: 40px; font-size: 13px; padding: 9px 13px; }
+.selection-actions .selection-clear { min-height: 40px; padding: 8px; color: #778397; font-size: 12px; }
+.selection-undo { margin-left: 8px; padding: 5px 8px; color: #2269cc; font-size: 12px; }
+#bulk-rating-dialog { width: calc(100% - 24px); max-width: 560px; max-height: calc(100dvh - 24px); overflow-y: auto; }
+#bulk-rating-context { margin: -8px 0 20px; color: #667085; font-size: 13px; }
+#bulk-rating-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+#bulk-rating-options .rating-choice { min-width: 0; min-height: 86px; }
+#bulk-rating-error { margin: 16px 0 0; font-size: 13px; }
+.bulk-rating-footer { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+@media (max-width: 720px) {
+  .selection-bar { flex-wrap: wrap; gap: 10px; }
+  .selection-actions { flex-basis: 100%; width: 100%; margin: 0; }
+  .selection-actions .button { flex: 1; font-size: 12px; }
+  .selection-actions .selection-clear { padding: 7px 3px; }
+}

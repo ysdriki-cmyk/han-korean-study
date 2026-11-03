@@ -16,8 +16,9 @@
   <link rel="stylesheet" href="./assets/navigation.css?v=3">
   <link rel="stylesheet" href="./assets/study-home.css?v=3">
   <link rel="stylesheet" href="./assets/sentences.css?v=2">
+  <link rel="stylesheet" href="./assets/library.css?v=1">
   <script src="./assets/config.js?v=3" defer></script>
-  <script type="module" src="./assets/app.js?v=39"></script>
+  <script type="module" src="./assets/app.js?v=40"></script>
 </head>
 <body data-view="home">
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -51,7 +52,7 @@
       <label class="check-label"><input id="library-hide" type="checkbox">答えを隠す</label>
       <button id="library-direction" class="button secondary" aria-label="隠す答えの方向">韓 → 訳</button>
     </div>
-    <div class="selection-bar"><label class="check-label"><input id="select-page" type="checkbox">このページ</label><span id="selection-count">0枚選択</span><button id="queue-selected" class="button primary" disabled>選んだカードで演習</button></div>
+    <div class="selection-bar"><label class="check-label"><input id="select-page" type="checkbox">このページ</label><span id="selection-count">0枚選択</span><button id="undo-bulk-rating" type="button" class="selection-undo" hidden>元に戻す</button><div class="selection-actions"><button id="clear-selection" type="button" class="selection-clear" disabled>選択解除</button><button id="open-bulk-rating" type="button" class="button secondary" aria-haspopup="dialog" disabled>ステータス変更</button><button id="queue-selected" class="button primary" disabled>選んだカードで演習</button></div></div>
     <div class="table-wrap"><table><thead><tr><th scope="col"><span class="sr-only">選択</span></th><th scope="col">韓国語</th><th scope="col" id="library-answer-label">日本語・英語</th><th scope="col">評価</th><th scope="col"><span class="sr-only">演習</span></th></tr></thead><tbody id="library-body"></tbody></table></div>
     <div class="pagination"><span id="page-info"></span><div><button id="prev-page" class="button secondary">← 前へ</button><button id="next-page" class="button secondary">次へ →</button></div></div>
   </section>
@@ -102,6 +103,13 @@
     </div>
     <div class="settings-footer"><span class="settings-match" id="settings-match-label"><strong id="settings-match">0</strong> 枚が対象</span><span id="settings-common-label" class="settings-match" hidden>全教材に適用</span><button id="reset-settings" type="button" class="reset-settings">初期設定</button><button id="save-settings" type="button" class="button secondary">設定だけ保存</button><button id="apply-settings" type="submit" class="button primary">演習を始める</button></div>
   </form>
+</dialog>
+<dialog id="bulk-rating-dialog" aria-labelledby="bulk-rating-title" aria-describedby="bulk-rating-context">
+  <div class="dialog-heading"><h2 id="bulk-rating-title">ステータスを変更</h2><button id="close-bulk-rating" type="button" class="icon-button" aria-label="閉じる">×</button></div>
+  <p id="bulk-rating-context"></p>
+  <div id="bulk-rating-options" role="group" aria-label="変更するステータス"></div>
+  <p id="bulk-rating-error" class="notice error" role="alert" hidden></p>
+  <div class="bulk-rating-footer"><button id="cancel-bulk-rating" type="button" class="button secondary">キャンセル</button><button id="apply-bulk-rating" type="button" class="button primary" disabled>変更する</button></div>
 </dialog>
 <div id="toast" class="toast" role="status" hidden></div>
 </body>
