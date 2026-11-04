@@ -1,12 +1,12 @@
 import {normalizeCards} from './core.js?v=2';
 import {normalizeVocabulary} from './vocabulary.js';
 import {getRecord, migrateLegacy} from './learning.js';
-import {normalizeSentences} from './sentences.js';
+import {normalizeSentences} from './sentences.js?v=2';
 
 export const DECKS = Object.freeze([
   Object.freeze({id:'vocabulary',label:'単語',subtitle:'韓国語 ↔ 日本語・英語',answerLabel:'日本語・英語',answerShort:'訳',answerKicker:'JAPANESE / ENGLISH',path:'./data/vocabulary.csv',parse:normalizeVocabulary}),
   Object.freeze({id:'kanji',label:'漢字',subtitle:'ハングル ↔ 漢字・意味',answerLabel:'漢字・意味',answerShort:'漢',answerKicker:'KANJI / MEANING',path:'./data/cards.csv',parse:normalizeCards}),
-  Object.freeze({id:'sentence',label:'sentence',subtitle:'韓国語の例文 ↔ 日本語の例文',answerLabel:'日本語',answerShort:'日',path:'./data/vocabulary.csv',sourceDeckId:'vocabulary',parse:normalizeSentences})
+  Object.freeze({id:'sentence',label:'sentence',subtitle:'韓国語の例文 ↔ 日本語の例文',answerLabel:'日本語',answerShort:'日',path:'./data/sentences.csv',parse:normalizeSentences})
 ]);
 export function getDeck(id){return DECKS.find(deck=>deck.id===id)||DECKS[0];}
 export function namespaceCards(cards,deckId){

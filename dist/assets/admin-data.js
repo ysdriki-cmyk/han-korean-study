@@ -26,18 +26,27 @@ const fields = {
     { names: ['英語','english','en'], use: '英語訳。日本語と少なくとも一方が必要。問題と解答・参考例に使用。' },
     { names: ['別解','正解表記','acceptedanswers'], use: '追加で正解と認める韓国語。複数はセル内改行。任意。' },
     { names: ['類語','synonyms'], use: '解答後に表示。自動採点の正解には追加しない。任意。' },
-    { names: ['カテゴリ','tags','タグ','#chat'], use: '分類名を保持。テーマ別の出題画面は今後の対応。' },
-    { names: ['例文_韓国語','exampleko','example_ko','例文（韓国語）','例文(韓国語)'], use: '単語の解答後に表示。日本語の例文とそろった行はsentenceの韓国語問題・正解にも使用。' },
-    { names: ['例文_日本語','examplejp','example_jp','例文（日本語）','例文(日本語)'], use: '例文の日本語訳。韓国語の例文とそろった行はsentenceの日本語問題・正解にも使用。' },
-    { names: ['解説','notes','備考','メモ'], use: '解答後の補足。問題のヒントや採点の別解には使わない。' },
+    { names: ['カテゴリ','tags','タグ','#chat'], use: 'テーマ別セットの分類。#と改行で複数指定可能。' },
+    { names: ['例文_韓国語','exampleko','example_ko','例文（韓国語）','例文(韓国語)'], use: '単語の解答後に表示。sentenceの演習問題は専用シートで管理する。' },
+    { names: ['例文_日本語','examplejp','example_jp','例文（日本語）','例文(日本語)'], use: '単語の解答後に表示する例文の日本語訳。sentenceへの自動追加は行わない。' },
+    { names: ['解説','notes','備考','メモ'], use: '旧補足の保存用。単語の演習画面では非表示。採点の別解には使わない。' },
     { names: ['topik1'], use: '空欄でない行を使用参考例に採用。#shopなどの分類名も保持。' },
+  ],
+  sentence: [
+    {names:['id_sentence'],use:'文章の固定ID。既存772件は移行CSVの番号を維持する。'},
+    {names:['例文_韓国語'],use:'읽기の問題・쓰기の正解。全文の読み上げに使用。'},
+    {names:['例文_日本語'],use:'쓰기の問題・읽기の正解。全文で照合する。'},
+    {names:['使用韓国語_main'],use:'メイン単語の辞書形。han_wordsを参照し、単語の学習済み判定と文章の優先順に使用。番号欄の順序とは独立。'},
+    {names:['使用単語id_main'],use:'メイン単語の固定ID。任意。同表記の別語義や改名時の照合に使用。'},
+    {names:['ジャンル','カテゴリ'],use:'文章セットの分類。#と改行で複数指定可能。'},
+    {names:['備考'],use:'編集メモとして保持。通常の演習画面では非表示。'},
   ],
 };
 const categoryUses = [
   'セットの固定ID。同じIDの行を1セットの条件としてまとめる。半角英数字・_・-で1〜100文字。',
   '学習画面に表示するセット名。1〜80文字。同じIDの続きの行では空欄を使用できる。',
-  '対象教材。one（한漢）またはword（単語）。同じIDの続きの行では空欄を使用できる。',
-  '条件を調べる教材の列名。oneは韓国語・出題ヒント・漢字候補・「解説・一覧」（または解説）・必須、wordは韓国語・カテゴリ・TOPIK1・日本語・英語。全件では空欄。',
+  '対象教材。one（한漢）・word（単語）・sentence（文章）。同じIDの続きの行では空欄を使用できる。',
+  '条件を調べる教材の列名。oneは韓国語・出題ヒント・漢字候補・「解説・一覧」・必須、wordは韓国語・カテゴリ・TOPIK1・日本語・英語、sentenceは両言語の例文・ジャンル・使用韓国語_main。全件では空欄。',
   '含む・含まない・タグ一致・等しい・印あり・空欄・空欄でない・全件を指定。印ありは必須列だけに使用。',
   '比較する文字やタグ。印あり・空欄・空欄でない・全件では空欄。その他の条件では1〜500文字。',
   '同じIDの条件をAND（すべて一致）またはOR（いずれか一致）でまとめる。最初の行で省略するとAND、続きの行では前の値を使う。',
@@ -57,7 +66,13 @@ export function inspectContent(deckId, text) {
   const rows = parseCSV(text);
   const columns = rows[0].map((header, index) => {
     const name = sheetHeader(header);
-    const definition = fields[deckId]?.find(field => field.names.includes(name));
+    let definition = fields[deckId]?.find(field => field.names.includes(name));
+    if (deckId==='sentence') {
+      if (/^使用韓国語_[0-9０-９]+$/u.test(name)) definition={use:'文中順の辞書形。番号が小さい順に表示し、han_wordsから原形・日本語を参照する。番号列は追加可能。'};
+      if (/^文中表記_[0-9０-９]+$/u.test(name)) definition={use:'任意。얼굴에・써など文中の形を表示。照合には同番号の使用韓国語を使う。'};
+      if (/^文中訳_[0-9０-９]+$/u.test(name)) definition={use:'任意。助詞・活用に合わせた文中の訳。空欄ならhan_wordsの日本語。'};
+      if (/^使用単語id_[0-9０-９]+$/u.test(name)) definition={use:'任意。同番号の単語の固定ID。曖昧な同表記を絞る。'};
+    }
     const sampleIndex = rows.findIndex((row, rowIndex) => rowIndex > 0 && String(row[index] || '').trim());
     return {
       cell: `${columnLetter(index)}1`, header: header || '（見出しなし）',
@@ -73,7 +88,7 @@ export function inspectContent(deckId, text) {
     references: deckId === 'vocabulary' ? examplesFromVocabulary(result.cards).length : null,
     sentences: deckId === 'vocabulary' ? sentencesFromVocabulary(result.cards).length : null,
     warnings: result.warnings,
-    categories: deckId === 'vocabulary' ? new Set(result.cards.flatMap(card => card.categories || [])).size : null,
+    categories: ['vocabulary','sentence'].includes(deckId) ? new Set(result.cards.flatMap(card => card.categories || [])).size : null,
     columns,
   };
 }

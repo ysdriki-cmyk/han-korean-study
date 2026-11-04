@@ -2,7 +2,8 @@ window.APP_CONFIG = {
   defaultDeck: 'kanji',
   decks: {
     vocabulary: {csvUrl: '/api/content/vocabulary', fallbackCsvUrl: './data/vocabulary.csv'},
-    kanji: {csvUrl: '/api/content/kanji', fallbackCsvUrl: './data/cards.csv'}
+    kanji: {csvUrl: '/api/content/kanji', fallbackCsvUrl: './data/cards.csv'},
+    sentence: {csvUrl: '/api/content/sentence', fallbackCsvUrl: './data/sentences.csv'}
   },
   referencesFromVocabulary: true,
   categorySetsCsvUrl: '/api/category-sets',

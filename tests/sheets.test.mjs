@@ -94,7 +94,7 @@ test('public content snapshots are source-specific and never overwrite learning 
   assert.equal(writeContentCache(blocked, 'kanji', 'url', 'CSV'), false);
 });
 
-test('content endpoints select only the two fixed Sheets, ignoring caller-supplied targets', async t => {
+test('content endpoints select only fixed Sheets, including sentence, ignoring caller-supplied targets', async t => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async url => {
     calls.push(url);
@@ -112,5 +112,8 @@ test('content endpoints select only the two fixed Sheets, ignoring caller-suppli
   assert.equal((await onRequest({ request, params: { deck: '__proto__' }, env: {} })).status, 404);
   assert.equal((await onRequest({ request: new Request(request.url, { method: 'POST' }), params: { deck: 'kanji' }, env: {} })).status, 405);
   assert.equal((await onRequest({ request, params: { deck: 'kanji' }, env: { KANJI_SHEET_CSV_URL: 'https://attacker.test/pub?output=csv' } })).status, 503);
-  assert.equal(calls.length, 2);
+  const sentence=await onRequest({request,params:{deck:'sentence'},env:{}});
+  assert.equal(sentence.status,200);
+  assert.equal(new URL(calls[2]).searchParams.get('gid'),'64554523');
+  assert.equal(calls.length, 3);
 });

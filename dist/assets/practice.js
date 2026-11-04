@@ -36,6 +36,12 @@ export function assessmentForAttempt(card, records, mode, correct) {
   };
 }
 
+export function sentenceMainWordStudied(card, records = {}) {
+  const word=card?.sentenceRefs ? card.mainWord : card?.mainWord || card?.sourceWord;
+  return card?.deckId === 'sentence' && Boolean(word) && ['read','write'].some(mode =>
+    practiceCount(word,records,mode)>0 || ['good','solid'].includes(ratingFor(word,records,mode)));
+}
+
 /** Source ranks and future due dates never invent a recent practice event. */
 export function lastPracticeAt(card, records = {}, mode = 'read') {
   const record = getRecord(card, records), selected = mode === 'write' ? 'write' : 'read';
@@ -59,7 +65,11 @@ export function makePracticeSession(cards, records = {}, settings = {}, { random
   }
   for (const attempts of [...groups.keys()].sort((a, b) => a - b)) {
     if (result.length >= size) break;
-    result.push(...makeSession(groups.get(attempts), { limit: size === Infinity ? 'all' : size - result.length, shuffle: settings.shuffle !== false, random }));
+    const group=groups.get(attempts);
+    for (const candidates of [group.filter(card=>sentenceMainWordStudied(card,records)),group.filter(card=>!sentenceMainWordStudied(card,records))]) {
+      if (result.length >= size) break;
+      result.push(...makeSession(candidates, { limit: size === Infinity ? 'all' : size - result.length, shuffle: settings.shuffle !== false, random }));
+    }
   }
   return result;
 }

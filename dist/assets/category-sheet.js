@@ -17,10 +17,12 @@ const clean = value => String(value ?? '').normalize('NFC').trim();
 const DECK_ALIASES = new Map([
   ['one', 'kanji'], ['kanji', 'kanji'], ['한漢', 'kanji'], ['漢字', 'kanji'],
   ['word', 'vocabulary'], ['vocabulary', 'vocabulary'], ['単語', 'vocabulary'],
+  ['sentence', 'sentence'], ['文章', 'sentence'], ['例文', 'sentence'],
 ]);
 const TARGETS = Object.freeze({
   kanji: Object.freeze({ 韓国語: 'han', 出題ヒント: 'kanji', 漢字候補: 'hanja', '解説・一覧': 'meaning', 解説: 'meaning', 必須: 'essential' }),
   vocabulary: Object.freeze({ 韓国語: 'han', カテゴリ: 'tags', TOPIK1: 'topikCategory', 日本語: 'kanji', 英語: 'english' }),
+  sentence: Object.freeze({ '例文_韓国語':'han', '例文_日本語':'kanji', ジャンル:'tags', カテゴリ:'tags', '使用韓国語_main':'mainKorean' }),
 });
 const MAX_ROWS = 10000, MAX_CATEGORIES = 100;
 const own = (object, key) => Object.hasOwn(object, key);
@@ -86,7 +88,7 @@ export function parseCategorySheet(text) {
     const orderValue = get('表示順');
     const order = orderValue ? Number(orderValue) : group.order;
     if (!label || label.length > 80) fail('カテゴリ名を1〜80文字で入力してください。');
-    if (!deckId) fail('教材はone（한漢）またはword（単語）を指定してください。');
+    if (!deckId) fail('教材はone（한漢）・word（単語）・sentence（文章）を指定してください。');
     if (!match) fail('条件の結合はANDまたはORを指定してください。');
     if (!Number.isFinite(order) || Math.abs(order) > 1e9) fail('表示順は数値で入力してください。');
     if (group.rows && (label !== group.label || deckId !== group.deckId || match !== group.match || order !== group.order)) {

@@ -1,17 +1,19 @@
-import { DECKS } from './decks.js';
-import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=3';
+import { DECKS, parseDeck } from './decks.js?v=4';
+import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=4';
 import { readContentSnapshot } from './content-cache.js?v=2';
-import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=2';
-import { nextReviewFor } from './review.js?v=3';
+import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=3';
+import { nextReviewFor } from './review.js?v=4';
+import { sentenceWordIssues } from './sentences.js?v=2';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const names = { kanji: '한漢', vocabulary: '単語', category_enshu: '演習セット（category_enshu）' };
+const names = { kanji: '한漢', vocabulary: '単語', sentence: 'sentence', category_enshu: '演習セット（category_enshu）' };
 const sourceNames = { remote: 'スプシ', cached: '保存済み教材', bundled: '同梱教材', unavailable: '教材なし' };
 const routes = {
   overview: { path: '/admin/', title: '運用チェック', label: '概要' },
   content: { path: '/admin/content/', title: '教材・接続状態', label: '教材' },
+  sentences: { path: '/admin/sentences/', title: '未登録・要確認の単語', label: '文章の単語' },
   schema: { path: '/admin/schema/', title: 'CSV・セルの対応', label: 'CSV' },
   storage: { path: '/admin/storage/', title: 'ログイン・保存', label: '保存' },
   guide: { path: '/admin/guide/', title: '更新ガイド', label: 'ガイド' },
@@ -19,7 +21,7 @@ const routes = {
 const config = window.APP_CONFIG || {};
 const contentIds = [...DECKS.filter(deck => !deck.sourceDeckId).map(deck => deck.id), ...(config.categorySetsCsvUrl ? ['category_enshu'] : [])];
 const results = new Map();
-let checking = false;
+let checking = false, sentenceIssues = [], reportSentenceText = null, reportWordText = null;
 const storage = { getItem: key => localStorage.getItem(key) };
 const formatTime = value => value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString('ja-JP', { timeZoneName: 'short' }) : '記録なし';
 const number = value => Number(value || 0).toLocaleString('ja-JP');
@@ -82,10 +84,11 @@ function renderContent() {
     if (result?.data) {
       const data = result.data;
       facts += fact(id === 'category_enshu' ? '有効なセット' : '有効なカード', `${number(data.count)} ${contentUnit(id)}`);
-      if (id !== 'category_enshu') facts += fact(id === 'kanji' ? '必須文字' : 'TOPIK1参考例', `${number(id === 'kanji' ? data.essential : data.references)} 件`);
+      if (id === 'kanji' || id === 'vocabulary') facts += fact(id === 'kanji' ? '必須文字' : 'TOPIK1参考例', `${number(id === 'kanji' ? data.essential : data.references)} 件`);
       facts += fact('CSVのデータ行', `${number(data.rawRows)} 行`);
       if (id === 'vocabulary') facts += fact('保持している分類', `${number(data.categories)} 種類`);
-      if (id === 'vocabulary') facts += fact('sentence対象', `${number(data.sentences)} 件（例文の両言語あり）`);
+      if (id === 'sentence') facts += fact('文章ジャンル', `${number(data.categories)} 種類`);
+      if (id === 'vocabulary') facts += fact('旧形式から移行できる例文', `${number(data.sentences)} 件（例文の両言語あり）`);
     }
     facts += fact('通常画面の前回読込', previous ? badge(sourceName(id, previous.source), previous.source === 'remote' ? 'ok' : 'warn') + `<span class="small">${number(previous.cardCount)}${contentUnit(id)} · ${esc(formatTime(previous.checkedAt))}</span>` : '未記録（通常画面を一度開くと記録）');
     facts += dateFact('通常画面の取得成功', previous?.lastSuccessAt);
@@ -111,6 +114,7 @@ function renderStorage() {
     ['han-hanja:preferences:v4', '教材・読み書き・出題設定'],
     ['han-hanja:content:v1:kanji', '漢字教材の正常取得版'],
     ['han-hanja:content:v1:vocabulary', '単語教材の正常取得版'],
+    ['han-hanja:content:v1:sentence', '文章教材の正常取得版'],
     ['han-hanja:content:v1:category_enshu', '演習セット定義の正常取得版'],
     [DIAGNOSTICS_KEY, '通常画面の教材取得状態'],
   ];
@@ -132,7 +136,23 @@ function renderStorage() {
   const symbols = { hard: '❌❌❌', again: '❌', unsure: '△', good: '○', solid: '◎', unseen: 'ー' };
   $('#storage-summary').insertAdjacentHTML('beforeend', `<h3>復習予定（最新30件）</h3>${schedules.length ? `<div class="table-wrap"><table><thead><tr><th>カードID</th><th>方向</th><th>評価</th><th>最終演習</th><th>次の復習</th><th>間隔</th></tr></thead><tbody>${schedules.map(row => `<tr><td><code>${esc(row.id)}</code></td><td>${row.mode === 'write' ? '쓰기' : '읽기'}</td><td>${symbols[row.assessment.rating] || 'ー'}</td><td>${esc(formatTime(row.assessment.lastAt))}</td><td>${esc(formatTime(row.dueAt))}</td><td>${number(row.intervalDays)}日</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">このブラウザには、日時付きの演習記録がまだありません。</p>'}`);
 }
-function render() { renderOverview(); renderContent(); renderSchema(); renderStorage(); }
+function renderSentenceIssues() {
+  const sentence=results.get('sentence'), vocabulary=results.get('vocabulary');
+  const ready=sentence?.ok && vocabulary?.ok;
+  $('#download-sentence-issues').disabled=true;
+  if (!ready) {
+    $('#sentence-issues').innerHTML='<p class="muted">sentenceシートとhan_wordsの取得に成功すると、照合結果を表示します。接続状態は「教材・接続状態」で確認できます。</p>';
+    sentenceIssues=[]; reportSentenceText=null; reportWordText=null; return;
+  }
+  if (sentence.text!==reportSentenceText || vocabulary.text!==reportWordText) {
+    sentenceIssues=sentenceWordIssues(parseDeck('sentence',sentence.text).cards,parseDeck('vocabulary',vocabulary.text).cards);
+    reportSentenceText=sentence.text; reportWordText=vocabulary.text;
+  }
+  $('#download-sentence-issues').disabled=!sentenceIssues.length;
+  $('#sentence-issues').innerHTML=`<p>${sentenceIssues.length?`${number(sentenceIssues.length)}語を確認してください。`:'未登録・要確認の語はありません。'}</p>${sentenceIssues.length?`<div class="table-wrap"><table><thead><tr><th>使用韓国語</th><th>単語ID</th><th>確認事項</th><th>例文ID・列</th></tr></thead><tbody>${sentenceIssues.map(issue=>`<tr><td lang="ko">${esc(issue.korean || '—')}</td><td>${esc(issue.wordId || '—')}</td><td>${esc(issue.reason)}</td><td>${issue.references.map(esc).join('<br>')}</td></tr>`).join('')}</tbody></table></div>`:''}`;
+}
+function render() { renderOverview(); renderContent(); renderSchema(); renderStorage(); renderSentenceIssues(); }
+
 
 async function inspectEndpoint(id) {
   const controller = new AbortController();
@@ -149,8 +169,8 @@ async function inspectEndpoint(id) {
     const text = await response.text();
     if (text.length > 3 * 1024 * 1024) throw new Error('CSVがサイズ上限を超えています。');
     const data = inspectSource(id, text);
-    const invalid = id === 'category_enshu' && !data.valid;
-    return { ok: !invalid, httpStatus, dataSource: response.headers.get('x-data-source') || '', data, ...(invalid ? { failureKind: 'input', error: data.error } : {}), checkedAt: new Date().toISOString() };
+    const invalid = (id === 'category_enshu' && !data.valid) || (id === 'sentence' && !data.count);
+    return { ok: !invalid, httpStatus, dataSource: response.headers.get('x-data-source') || '', data, text, ...(invalid ? { failureKind: 'input', error: data.error || 'sentenceシートに有効な文章がありません。' } : {}), checkedAt: new Date().toISOString() };
   } catch (error) {
     return { ok: false, httpStatus, error: controller.signal.aborted ? '取得がタイムアウトしました。' : error instanceof Error ? error.message : '接続を確認できませんでした。', checkedAt: new Date().toISOString() };
   } finally { clearTimeout(timer); }
@@ -170,6 +190,14 @@ document.addEventListener('click', event => {
 window.addEventListener('popstate', () => routeTo(routeFromURL()));
 window.addEventListener('storage', event => { if (event.key === null || event.key?.startsWith('han-hanja:')) render(); });
 $('#recheck').addEventListener('click', recheck);
+$('#download-sentence-issues').onclick=()=>{
+  if (!sentenceIssues.length) return;
+  const quote=value=>'"'+String(value??'').replaceAll('"','""')+'"';
+  const rows=[['韓国語','使用単語ID','文中表記','確認事項','例文IDと列'],...sentenceIssues.map(issue=>[issue.korean,issue.wordId,issue.surfaces.join('／'),issue.reason,issue.references.join('、')])];
+  const csv='\uFEFF'+rows.map(row=>row.map(quote).join(',')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const link=document.createElement('a'); link.href=url; link.download='sentence_missing_words.csv'; link.click(); setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
 $('#sheet-link').href = 'https://docs.google.com/spreadsheets/d/1eBOPXITG1MNnBZtNDk2mAFkxuRGqjtJVd7AtiiqtUkQ/edit';
 routeTo(routeFromURL());
 recheck();

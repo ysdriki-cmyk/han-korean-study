@@ -63,8 +63,8 @@ Workers & Pages → Create application → Pages → Import an existing Git repo
 
 ### 現在の実装
 
-- `/api/content/kanji` と `/api/content/vocabulary` が、それぞれ公開済みGoogle CSVを返す。接続URLは `functions/api/content/[deck].js` に設定済みで、APIキーは不要。
-- 任意の環境変数 `KANJI_SHEET_CSV_URL`／`VOCABULARY_SHEET_CSV_URL` で差し替えられる。従来の `/api/cards` と `SHEET_CSV_URL` も互換用に残す。
+- `/api/content/kanji`・`/api/content/vocabulary`・`/api/content/sentence` が、それぞれ公開済みGoogle CSVを返す。接続URLは `functions/api/content/[deck].js` に設定済みで、APIキーは不要。
+- 任意の環境変数 `KANJI_SHEET_CSV_URL`／`VOCABULARY_SHEET_CSV_URL`／`SENTENCE_SHEET_CSV_URL` で差し替えられる。従来の `/api/cards` と `SHEET_CSV_URL` も互換用に残す。
 - [列名とIDの別名](../docs/content-schema.md)に対応。`有効`列は使わず、韓国語と出題内容・訳がある行を採用する。
 - 単語の空欄でない `TOPIK1` 列から参考例を生成し、分類名を将来のテーマ学習用にも保持する。参考例用の3枚目のSheetは不要。
 - 約60秒ごと・タブに戻ったときに更新する。ID重複・空の教材・取得失敗時は更新しない。最後に正常に読めた教材をブラウザに保存し、取得できなければその版、なければ同梱教材を使う。途中のセットの問題・採点候補は差し替えない。

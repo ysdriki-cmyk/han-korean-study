@@ -4,6 +4,7 @@ const BASE = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRh2suLk8kb79htB7N
 const sources = Object.freeze({
   kanji: { gid: '29317581', variable: 'KANJI_SHEET_CSV_URL' },
   vocabulary: { gid: '0', variable: 'VOCABULARY_SHEET_CSV_URL' },
+  sentence: { gid: '64554523', variable: 'SENTENCE_SHEET_CSV_URL' },
 });
 
 export function onRequest({ request, env, params }) {

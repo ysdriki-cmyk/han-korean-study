@@ -19,6 +19,7 @@
 | --- | --- | --- |
 | `/api/content/kanji` | `29317581` | `KANJI_SHEET_CSV_URL` |
 | `/api/content/vocabulary` | `0` | `VOCABULARY_SHEET_CSV_URL` |
+| `/api/content/sentence` | `64554523` | `SENTENCE_SHEET_CSV_URL` |
 
 現在の公開URLはルート内に設定済み。環境変数がなければそのURLを使う。別のSheetへ変更する場合は環境変数または固定URLを更新し、再デプロイする。環境変数はProductionとPreviewで必要に応じて分ける。
 
@@ -46,13 +47,15 @@ GET/HEADのみ。HTTPSのGoogle Sheets CSV URLだけを許可し、Googleの配�
 
 取得先を利用者のURL引数で指定する中継APIにはしない。未設定・設定不備は503、取得失敗は502、書き込み要求は405。内部エラーや秘密値を応答に含めない。
 
-旧 `/api/cards` と `SHEET_CSV_URL` は1教材用の互換APIとして残す。新しい2シート連携では使わない。
+旧 `/api/cards` と `SHEET_CSV_URL` は1教材用の互換APIとして残す。現在の3シート連携では使わない。
 
 ## 管理画面
 
 `/admin/` 以下に管理用画面を配置し、`dist/_redirects` で配下のURLを同じHTMLへ解決する。学習画面にリンクは置かない。教材の取得失敗・予備教材への切替は通常画面へ通知せず、`/admin/content/` で確認する。
 
 管理画面のAPI確認と通常画面の使用元を分け、スプシ・保存済み・同梱教材、確認日時、成功日時、件数を表示する。`/admin/schema/` は実際のCSVから列とセルを確認し、`/admin/storage/` と `/admin/guide/` は保存状態と更新手順を表示する。
+
+`/admin/sentences/` はsentenceとhan_wordsの最新CSVを照合し、未登録・ID不一致・複数候補の語を例文ID・使用列と一緒に表示する。CSVで書き出せる。どちらかの取得に失敗した場合は正常を装わず、照合を保留する。
 
 現状は管理者認証なし。URLを知る人は閲覧可能であり、noindexや導線を隠すことは認証の代わりにならない。Cloudflare Accessを使う場合は `/admin` と `/admin/*` を対象に、許可する管理者を限定する。秘密値や他の利用者の記録をこの画面へ返すAPIは設けていない。
 

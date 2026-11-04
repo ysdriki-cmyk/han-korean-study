@@ -4,7 +4,7 @@ import { ratingFor } from './assessment.js';
 import { practiceCount } from './practice.js';
 
 const DECKS = new Set(['kanji', 'vocabulary', 'sentence']);
-const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory']);
+const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory', 'mainKorean']);
 const TAG_FIELDS = new Set(['tags', 'topikCategory']);
 const MAX_CUSTOM_SETS = 100, MAX_RULES = 20, MAX_VALUE = 500, MAX_LABEL = 80;
 const object = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -95,6 +95,9 @@ export function buildStudySets(deckId, cards, customSets = []) {
   const sets = [{ id: 'all', label: 'すべて', group: '基本', kind: 'all', deckId }];
   if (deckId === 'kanji') {
     sets.push({ id: 'essential', label: '必須漢字', group: '基本', kind: 'essential', deckId });
+  } else if (deckId === 'sentence') {
+    const labels=[...new Set(source.flatMap(card=>categoryLabels(card.tags)))].sort((a,b)=>a.localeCompare(b,'ja'));
+    for (const value of labels) sets.push({id:tagId('tags',value),label:value,group:'ジャンル',kind:'tag',deckId,field:'tags',value});
   } else {
     sets.push({ id: 'topik', label: 'TOPIK1', group: '基本', kind: 'topik', deckId });
     for (const [field, group] of [['tags', 'カテゴリ'], ['topikCategory', 'TOPIK1']]) {
@@ -133,9 +136,9 @@ export function cardsForStudySet(cards, set) {
   if (!object(set) || !DECKS.has(set.deckId)) return [];
   const source = deckCards(cards, set.deckId);
   if (set.kind === 'sentence' && set.deckId === 'sentence' && set.sourceSet?.deckId === 'vocabulary') {
-    const words = source.map(card => card.sourceWord).filter(Boolean);
+    const words = source.flatMap(card => card.sourceWords || (card.sourceWord ? [card.sourceWord] : []));
     const included = new Set(cardsForStudySet(words, set.sourceSet).map(card => card.id));
-    return source.filter(card => included.has(card.sourceWord?.id));
+    return source.filter(card => (card.sourceWords || (card.sourceWord ? [card.sourceWord] : [])).some(word=>included.has(word.id)));
   }
   if (set.kind === 'all' && set.id === 'all') return source;
   if (set.kind === 'essential' && set.id === 'essential' && set.deckId === 'kanji') return source.filter(essentialKanji);
