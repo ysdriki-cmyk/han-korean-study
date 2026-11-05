@@ -4,6 +4,7 @@ import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
+import { loadInitialContent } from './content-startup.js';
 import { recordContentDiagnostics } from './content-diagnostics.js?v=3';
 import { renderTopikUsage, renderVocabularyExample } from './topik-view.js?v=11';
 import { getRecord, matchHangul } from './learning.js';
@@ -515,7 +516,7 @@ function restoreRecords() {
 }
 async function loadTopikExamples() {
   const vocabulary = deckData.get('vocabulary');
-  if (config.referencesFromVocabulary && vocabulary?.source && vocabulary.source !== 'bundled') return examplesFromVocabulary(vocabulary.cards);
+  if (config.referencesFromVocabulary && vocabulary?.source && (vocabulary.source !== 'bundled' || vocabulary.hasTopikColumn)) return examplesFromVocabulary(vocabulary.cards);
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), config.fetchTimeoutMs || 10000);
   try {
     const response = await fetch('./data/topik1.csv', { signal: controller.signal, cache: 'no-store', credentials: 'same-origin' });
@@ -536,33 +537,18 @@ async function retryTopikExamples() {
 }
 async function loadCourse(id) {
   const source = courseConfig(id);
-  let remoteError = null;
-  if (source.csvUrl) {
-    try {
-      const result = await fetchText(source.csvUrl, id);
-      const fetchedAt = new Date().toISOString();
-      cacheContent(id, source.csvUrl, result.text, fetchedAt);
-      trackContent(id, { ...result, source: 'remote', fetchedAt });
-      return { ...result, source: 'remote', fetchedAt };
-    } catch (error) {
-      remoteError = error;
-      console.warn('[教材取得]', id, error instanceof Error ? error.message : '取得に失敗しました。');
-      try {
-        const snapshot = readContentSnapshot(localStorage, id, source.csvUrl);
-        if (snapshot) {
-          const result = { ...snapshot, ...parseDeck(id, snapshot.text), source: 'cached' };
-          trackContent(id, result, error);
-          return result;
-        }
-      } catch { /* Fall back to the bundled deck if storage is unavailable or invalid. */ }
-    }
-  }
   try {
-    const result = { ...await fetchText(source.fallbackCsvUrl, id), source: 'bundled' };
-    trackContent(id, result, remoteError);
+    const parse=text=>{
+      const parsed=parseDeck(id,text);
+      if(!parsed.cards.length) throw new Error('有効な教材がありません。');
+      return parsed;
+    };
+    const result=await loadInitialContent({storage:{getItem:key=>localStorage.getItem(key)},id,url:source.csvUrl,bundledUrl:source.fallbackCsvUrl,parse,fetchText:url=>fetchText(url,id)});
+    if(result.source==='remote') cacheContent(id,source.csvUrl,result.text,result.fetchedAt);
+    trackContent(id,result);
     return result;
   } catch (error) {
-    trackContent(id, { source: 'unavailable' }, remoteError || error);
+    trackContent(id, { source: 'unavailable' }, error);
     throw error;
   }
 }
@@ -583,9 +569,27 @@ function trackCategoryContent(source, error = null, fetchedAt = null) {
     });
   } catch { /* Set diagnostics never interrupt practice or change learning records. */ }
 }
-async function loadCategorySets() {
+async function loadCategorySets({initial=false}={}) {
   const url = config.categorySetsCsvUrl;
   if (!url) return false;
+  if(initial) {
+    try {
+      const parse=text=>{const parsed=parseCategorySheet(text);if(!parsed.sets.length)throw new Error('演習セットがありません。');return parsed;};
+      const result=await loadInitialContent({storage:{getItem:key=>localStorage.getItem(key)},id:'category_enshu',url,bundledUrl:config.categorySetsFallbackCsvUrl || './data/category-sets.csv',parse,fetchText:async target=>{
+        const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),config.fetchTimeoutMs||20000);
+        try {
+          const destination=new URL(target,location.href);
+          if(destination.protocol!=='https:' && destination.origin!==location.origin)throw new Error('セットの取得先を確認してください。');
+          const response=await fetch(destination,{signal:controller.signal,cache:'no-store',credentials:destination.origin===location.origin?'same-origin':'omit'});
+          if(!response.ok)throw new Error('演習セットを取得できませんでした。');
+          const text=await response.text();if(text.length>3*1024*1024)throw new Error('演習セットのサイズを確認してください。');
+          return {text,...parse(text)};
+        } finally {clearTimeout(timer);}
+      }});
+      const changed=applyCategorySheet(result.text);trackCategoryContent(result.source,null,result.fetchedAt);
+      return changed;
+    } catch(error) {trackCategoryContent('unavailable',error);return false;}
+  }
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), config.fetchTimeoutMs || 20000);
   try {
     const target = new URL(url, location.href);
@@ -654,7 +658,7 @@ async function refreshRemote() {
       }
     });
     const categoriesChanged = await categoryTask;
-    updateSentenceDeck();
+    if(referencesChanged) updateSentenceDeck();
     if (changed || categoriesChanged) {
       updateWordKanjiReferences();
       updateCourseChrome(); renderOverview(); renderLibrary();
@@ -828,7 +832,7 @@ async function init() {
     for(const collection of ['core','extra']) if(typeof setPreferences.sentenceSelections?.[collection]==='string') sentenceSelections[collection]=setPreferences.sentenceSelections[collection];
   }
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
-  const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets()]);
+  const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets({initial:true})]);
   results.slice(0, SOURCE_DECKS.length).forEach((result, index) => { if (result.status === 'fulfilled') deckData.set(SOURCE_DECKS[index].id, result.value); });
   updateSentenceDeck(); updateWordKanjiReferences();
   // A live word snapshot supplies its own references; bundled decks retain the legacy fallback.
@@ -841,6 +845,9 @@ async function init() {
   }
   cards = deckData.get(activeDeck)?.cards || []; restoreRecords(); loaded = true; syncSettingsForm(); startSession(); renderLibrary(); savePreferences();
   if (!cards.length) notice('学習データを読み込めませんでした。通信を確認して再読み込みしてください。', true);
-  if (config.categorySetsCsvUrl || DECKS.some(deck => courseConfig(deck.id).csvUrl)) setInterval(refreshRemote, config.refreshIntervalMs || 60000);
+  if (config.categorySetsCsvUrl || DECKS.some(deck => courseConfig(deck.id).csvUrl)) {
+    void refreshRemote();
+    setInterval(refreshRemote, config.refreshIntervalMs || 60000);
+  }
 }
 init().catch(() => { loaded = true; notice('画面を開けませんでした。再読み込みしてください。', true); renderCard(); });

@@ -80,6 +80,7 @@ function renderContent() {
     const result = results.get(id), previous = diagnostics.decks[id], cached = cachedInfo(id);
     const state = resultBadge(result);
     let facts = fact('管理画面の確認', state) + dateFact('確認した時刻', result?.checkedAt);
+    if(result?.edgeCache) facts += fact('Cloudflareの教材キャッシュ',esc(({HIT:'保存版を配信',STALE:'保存版を配信・裏で更新確認',MISS:'Googleから取得'})[result.edgeCache] || result.edgeCache)) + dateFact('キャッシュの取得時刻',result.cachedAt);
     facts += fact('API', `<code>${esc(endpoint(id) || '未設定')}</code>${result?.httpStatus ? `<span class="small">HTTP ${esc(result.httpStatus)}${result.dataSource ? ` · ${esc(result.dataSource)}` : ''}</span>` : ''}`);
     if (result?.data) {
       const data = result.data;
@@ -170,7 +171,7 @@ async function inspectEndpoint(id) {
     if (text.length > 3 * 1024 * 1024) throw new Error('CSVがサイズ上限を超えています。');
     const data = inspectSource(id, text);
     const invalid = (id === 'category_enshu' && !data.valid) || (id === 'sentence' && !data.count);
-    return { ok: !invalid, httpStatus, dataSource: response.headers.get('x-data-source') || '', data, text, ...(invalid ? { failureKind: 'input', error: data.error || 'sentenceシートに有効な文章がありません。' } : {}), checkedAt: new Date().toISOString() };
+    return { ok: !invalid, httpStatus, dataSource: response.headers.get('x-data-source') || '', edgeCache:response.headers.get('x-content-cache') || '',cachedAt:response.headers.get('x-content-cached-at') || null,data, text, ...(invalid ? { failureKind: 'input', error: data.error || 'sentenceシートに有効な文章がありません。' } : {}), checkedAt: new Date().toISOString() };
   } catch (error) {
     return { ok: false, httpStatus, error: controller.signal.aborted ? '取得がタイムアウトしました。' : error instanceof Error ? error.message : '接続を確認できませんでした。', checkedAt: new Date().toISOString() };
   } finally { clearTimeout(timer); }
