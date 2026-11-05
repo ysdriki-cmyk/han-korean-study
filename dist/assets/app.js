@@ -15,8 +15,9 @@ import { icon } from './icons.js?v=3';
 import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
 import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
-import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=3';
-import { renderStudyHome } from './study-home.js?v=4';
+import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=4';
+import { sentenceCollectionCards } from './sentence-collections.js';
+import { renderStudyHome } from './study-home.js?v=5';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
@@ -38,6 +39,7 @@ const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'home', activeDeck = 'kanji';
 let selectedSetIds = { kanji: 'essential', vocabulary: 'all', sentence: 'default:all' }, sheetSets = [], categorySheetText = '', sheetSetsLoaded = false;
 let homeQuery = '', homeGroup = 'all', homeSearchTimer;
+let sentenceCollection='core', sentenceSelections={core:'default:all',extra:'all'};
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
 let sessionCards = [];
@@ -89,35 +91,46 @@ function savePreferences() {
   preferences.version = 4; preferences.deckId = activeDeck;
   preferences.courses[activeDeck] = { ...preferences.courses[activeDeck], ...settings };
   const saved = safeWrite(PREF_KEY, preferences);
-  const setsSaved = safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds });
+  const setsSaved = safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds, sentenceCollection, sentenceSelections:{...sentenceSelections,[sentenceCollection]:selectedSetIds.sentence} });
   return saved && setsSaved;
 }
 function availableStudySets(id = activeDeck) {
   if (id === 'sentence') {
     const own=sheetSets.filter(set=>set.deckId==='sentence');
-    return own.length ? own : buildStudySets('sentence',deckData.get('sentence')?.cards || []);
+    return own.length && sentenceCollection==='core' ? own.map(set=>({...set,collection:'core'})) : buildStudySets('sentence',deckData.get('sentence')?.cards || [],[],{collection:sentenceCollection});
   }
   const source = deckData.get(id)?.cards || (id === activeDeck ? cards : []);
   const generated = buildStudySets(id, source);
   return sheetSetsLoaded ? sheetSets.filter(set => set.deckId === id) : generated;
 }
 function activeStudySet() {
-  if (selectedSetIds[activeDeck] === 'default:all') return { id: 'all', label: 'すべて', kind: 'all', deckId: activeDeck };
+  if (selectedSetIds[activeDeck] === 'default:all') return { id: 'all', label: 'すべて', kind: 'all', deckId: activeDeck, ...(activeDeck==='sentence'?{collection:sentenceCollection}:{}) };
   return availableStudySets().find(set => set.id === selectedSetIds[activeDeck])
-    || (activeDeck === 'sentence' ? projectSentenceSets(availableStudySets('vocabulary')).find(set=>set.id===selectedSetIds.sentence) : undefined);
+    || (activeDeck === 'sentence' ? projectSentenceSets(availableStudySets('vocabulary')).map(set=>({...set,collection:sentenceCollection})).find(set=>set.id===selectedSetIds.sentence) : undefined);
 }
 function studyCards() { return cardsForStudySet(cards, activeStudySet()); }
 function scopedSettings(candidate = settings) { return { ...candidate, scope: 'all' }; }
 function renderHome() {
   const courses = ['kanji','vocabulary','sentence'].map(id => {
-    const source = deckData.get(id)?.cards || [];
+    const raw = deckData.get(id)?.cards || [];
+    const source = id==='sentence' ? sentenceCollectionCards(raw,'core') : raw;
     return { id, label: id === 'kanji' ? '한漢' : getDeck(id).label, count: source.length, available: deckData.has(id), progress: setProgress(source, records, settings.mode) };
   });
   const sets = availableStudySets().map(set => {
     const members = cardsForStudySet(cards, set);
     return { ...set, ...setProgress(members, records, settings.mode), eligibleCount: practicePool(members, records, scopedSettings()).length };
   });
-  $('#home-view').innerHTML = renderStudyHome({ courses, activeDeck, mode: settings.mode, sets, query: homeQuery, group: homeGroup, canResume: !!(answers.size || submitted) && position < session.length });
+  const extraProgress=setProgress(sentenceCollectionCards(deckData.get('sentence')?.cards || [],'extra'),records,settings.mode);
+  $('#home-view').innerHTML = renderStudyHome({ courses, activeDeck, mode: settings.mode, sets, query: homeQuery, group: homeGroup, sentenceCollection, extraProgress, canResume: !!(answers.size || submitted) && position < session.length });
+}
+function switchSentenceCollection(next) {
+  if (!['core','extra'].includes(next) || next===sentenceCollection) return;
+  sentenceSelections[sentenceCollection]=selectedSetIds.sentence;
+  sentenceCollection=next;
+  selectedSetIds.sentence=sentenceSelections[next] || 'default:all';
+  homeQuery=''; homeGroup='all'; selected.clear(); revealedRows.clear(); rankFilter='all'; page=0;
+  $('#library-search').value='';
+  syncSettingsForm(); startSession(); renderLibrary(); savePreferences();
 }
 function chooseStudySet(id, { list = false } = {}) {
   const set = availableStudySets().find(item => item.id === id);
@@ -156,14 +169,14 @@ function updateCourseChrome() {
   $('#library-answer-label').textContent = target;
   const searchText = activeDeck === 'sentence' ? '例文・単語を検索' : activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
   $('#library-search').placeholder = searchText; $('#library-search').setAttribute('aria-label', searchText);
-  $('#active-set-label').textContent = activeStudySet()?.label || 'セット未選択';
+  $('#active-set-label').textContent = `${activeDeck==='sentence' && sentenceCollection==='extra'?'extra · ':''}${activeStudySet()?.label || 'セット未選択'}`;
   document.title = view === 'home' ? '한と漢 — ホーム' : `한と漢 — ${activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}`;
 }
 function renderOverview() {
   const members = studyCards(), totals = counts(), mastered = totals.good + totals.solid;
   $('#nav-count').textContent = members.length.toLocaleString('ja-JP');
   $('#library-total').textContent = members.length.toLocaleString('ja-JP');
-  $('#library-title').textContent = activeStudySet()?.label || 'カード一覧';
+  $('#library-title').textContent = `${activeDeck==='sentence' && sentenceCollection==='extra'?'extra · ':''}${activeStudySet()?.label || 'カード一覧'}`;
   $('#settled-count').textContent = mastered.toLocaleString('ja-JP');
   $('#settled-percent').textContent = `${members.length ? Math.round(mastered / members.length * 100) : 0}%`;
   $('#rank-distribution').innerHTML = STATUSES.filter(item => totals[item.id]).map(item => `<span class="rating-${item.id}" style="width:${totals[item.id] / members.length * 100}%;background:var(--rating-line)" title="${esc(item.symbol)} ${totals[item.id]}枚"></span>`).join('');
@@ -691,7 +704,8 @@ function bind() {
       return;
     }
     const target = event.target.closest('button,a'); if (!target) return;
-    if (target.dataset.homeDeck && loaded) { switchDeck(target.dataset.homeDeck); return; }
+    if (target.dataset.homeDeck && loaded) { switchDeck(target.dataset.homeDeck); if(target.dataset.homeDeck==='sentence') switchSentenceCollection('core'); return; }
+    if (target.dataset.sentenceCollection && loaded && activeDeck==='sentence') { switchSentenceCollection(target.dataset.sentenceCollection); return; }
     if (target.dataset.homeMode && loaded) { switchMode(target.dataset.homeMode); return; }
     if (target.hasAttribute('data-start-practice') && loaded) { startDefaultPractice(); return; }
     if (target.hasAttribute('data-start-set') && loaded) { chooseStudySet(target.dataset.startSet); return; }
@@ -809,6 +823,8 @@ async function init() {
   const setPreferences = readJSON(SET_PREF_KEY, null);
   if (setPreferences?.version === 1 && setPreferences.selected && typeof setPreferences.selected === 'object') {
     for (const id of ['kanji','vocabulary','sentence']) if (typeof setPreferences.selected[id] === 'string') selectedSetIds[id] = setPreferences.selected[id];
+    if (setPreferences.sentenceCollection==='extra') sentenceCollection='extra';
+    for(const collection of ['core','extra']) if(typeof setPreferences.sentenceSelections?.[collection]==='string') sentenceSelections[collection]=setPreferences.sentenceSelections[collection];
   }
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
   const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets()]);

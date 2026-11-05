@@ -2,6 +2,7 @@ import { essentialKanji } from './kanji.js';
 import { categoryLabels } from './sheet-fields.js';
 import { ratingFor } from './assessment.js';
 import { practiceCount } from './practice.js';
+import { sentenceCollectionCards } from './sentence-collections.js';
 
 const DECKS = new Set(['kanji', 'vocabulary', 'sentence']);
 const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory', 'mainKorean']);
@@ -62,6 +63,10 @@ function normalizeCustomSet(value, deckId) {
     metadata = { source: 'sheet', sourceId: value.sourceId, order: value.order };
   }
   const base = { id: value.id, label, group: value.source === 'sheet' ? 'セット' : 'カスタム', kind: value.kind, deckId, ...metadata };
+  if (value.collection != null) {
+    if (deckId !== 'sentence' || !['core','extra'].includes(value.collection)) return null;
+    base.collection=value.collection;
+  }
   if (value.kind === 'all' && value.source === 'sheet') {
     if ((value.rules != null && (!Array.isArray(value.rules) || value.rules.length))
       || (value.match != null && value.match !== 'all')) return null;
@@ -89,15 +94,18 @@ export function normalizeCustomSets(value, deckId) {
 }
 
 /** Set identities depend on their conditions, never their row order or count. */
-export function buildStudySets(deckId, cards, customSets = []) {
+export function buildStudySets(deckId, cards, customSets = [], {collection='core'} = {}) {
   if (!DECKS.has(deckId)) return [];
-  const source = deckCards(cards, deckId);
+  const source = deckId==='sentence' ? sentenceCollectionCards(deckCards(cards,deckId),collection) : deckCards(cards, deckId);
   const sets = [{ id: 'all', label: 'すべて', group: '基本', kind: 'all', deckId }];
   if (deckId === 'kanji') {
     sets.push({ id: 'essential', label: '必須漢字', group: '基本', kind: 'essential', deckId });
   } else if (deckId === 'sentence') {
     const labels=[...new Set(source.flatMap(card=>categoryLabels(card.tags)))].sort((a,b)=>a.localeCompare(b,'ja'));
-    for (const value of labels) sets.push({id:tagId('tags',value),label:value,group:'ジャンル',kind:'tag',deckId,field:'tags',value});
+    for (const value of labels) {
+      if(value.normalize('NFKC').toLowerCase()==='subtitle') continue;
+      sets.push({id:tagId('tags',value),label:value,group:'ジャンル',kind:'tag',deckId,field:'tags',value});
+    }
   } else {
     sets.push({ id: 'topik', label: 'TOPIK1', group: '基本', kind: 'topik', deckId });
     for (const [field, group] of [['tags', 'カテゴリ'], ['topikCategory', 'TOPIK1']]) {
@@ -106,7 +114,8 @@ export function buildStudySets(deckId, cards, customSets = []) {
       for (const value of labels) sets.push({ id: tagId(field, value), label: value, group, kind: 'tag', deckId, field, value });
     }
   }
-  return [...sets, ...normalizeCustomSets(customSets, deckId)];
+  const result=[...sets, ...normalizeCustomSets(customSets, deckId)];
+  return deckId==='sentence' ? result.map(set=>({...set,collection})) : result;
 }
 
 /** Reuse word-set conditions on the original words, then select only their complete examples. */
@@ -134,7 +143,7 @@ function matchesRule(card, rule) {
 /** Unknown sets and malformed saved criteria never fall back to all cards. */
 export function cardsForStudySet(cards, set) {
   if (!object(set) || !DECKS.has(set.deckId)) return [];
-  const source = deckCards(cards, set.deckId);
+  const source = set.deckId==='sentence' ? sentenceCollectionCards(deckCards(cards,set.deckId),set.collection || 'core') : deckCards(cards, set.deckId);
   if (set.kind === 'sentence' && set.deckId === 'sentence' && set.sourceSet?.deckId === 'vocabulary') {
     const words = source.flatMap(card => card.sourceWords || (card.sourceWord ? [card.sourceWord] : []));
     const included = new Set(cardsForStudySet(words, set.sourceSet).map(card => card.id));
