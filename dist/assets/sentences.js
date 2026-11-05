@@ -27,7 +27,7 @@ export function sentencesFromVocabulary(words) {
     deckId: 'sentence', kind: 'sentence',
     han: clean(word.exampleKo), kanji: clean(word.exampleJp),
     hanja: '', meaning: '', english: '', state: '', flagged: false,
-    exampleKo: '', exampleJp: '', answerVariants: [], synonyms: '', notes: '',
+    exampleKo: '', exampleJp: '', answerVariants: [], synonyms: '', notes: '', translation2: '',
     sourceWord: word.deckId === 'vocabulary' ? word : { ...word, id: `vocabulary:${word.id}`, sourceId: word.id, deckId: 'vocabulary' },
   }));
 }
@@ -59,7 +59,7 @@ export function normalizeSentences(text) {
       .filter(ref=>ref.korean || ref.wordId);
     const tags=value('ジャンル') || value('カテゴリ');
     cards.push({id,han,kanji,hanja:'',meaning:'',english:'',state:'',flagged:false,kind:'sentence',exampleKo:'',exampleJp:'',answerVariants:[],synonyms:'',
-      notes:value('備考'),tags,categories:categoryLabels(tags),mainKorean:value('使用韓国語_main'),mainWordId:value('使用単語ID_main'),sentenceRefs});
+      notes:value('備考'),translation2:value('訳2'),tags,categories:categoryLabels(tags),mainKorean:value('使用韓国語_main'),mainWordId:value('使用単語ID_main'),sentenceRefs});
   }
   return {cards,warnings,excludedRows};
 }

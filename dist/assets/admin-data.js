@@ -1,9 +1,9 @@
 import { parseCSV } from './core.js';
-import { parseDeck } from './decks.js';
+import { parseDeck } from './decks.js?v=5';
 import { sheetHeader } from './sheet-fields.js';
 import { essentialKanji } from './kanji.js';
 import { examplesFromVocabulary } from './topik.js';
-import { sentencesFromVocabulary } from './sentences.js';
+import { sentencesFromVocabulary } from './sentences.js?v=3';
 import { parseCategorySheet, CATEGORY_SHEET_HEADERS } from './category-sheet.js';
 
 const common = [
@@ -36,6 +36,7 @@ const fields = {
     {names:['id_sentence'],use:'文章の固定ID。既存772件は移行CSVの番号を維持する。'},
     {names:['例文_韓国語'],use:'읽기の問題・쓰기の正解。全文の読み上げに使用。'},
     {names:['例文_日本語'],use:'쓰기の問題・읽기の正解。全文で照合する。'},
+    {names:['訳2','訳２'],use:'任意の補足訳。읽기・쓰기とも解答後だけ表示。空欄は非表示で、出題・自動採点には使用しない。'},
     {names:['使用韓国語_main'],use:'メイン単語の辞書形。han_wordsを参照し、単語の学習済み判定と文章の優先順に使用。番号欄の順序とは独立。'},
     {names:['使用単語id_main'],use:'メイン単語の固定ID。任意。同表記の別語義や改名時の照合に使用。'},
     {names:['ジャンル','カテゴリ'],use:'文章セットの分類。#と改行で複数指定可能。'},

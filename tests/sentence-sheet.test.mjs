@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDeck, restoreLearningRecords } from '../dist/assets/decks.js';
+import { parseDeck, restoreLearningRecords, answerFields } from '../dist/assets/decks.js';
 import { resolveSentenceWords, linkSentenceWords, sentenceWordIssues } from '../dist/assets/sentences.js';
-import { renderSentenceWords } from '../dist/assets/sentence-view.js';
+import { renderSentenceWords, renderSentenceTranslation2 } from '../dist/assets/sentence-view.js';
+import { readingAssessment } from '../dist/assets/reading.js';
 import { makePracticeSession, sentenceMainWordStudied } from '../dist/assets/practice.js';
 import { recordAssessment } from '../dist/assets/assessment.js';
 import { getRecord } from '../dist/assets/learning.js';
@@ -13,6 +14,31 @@ import { inspectContent } from '../dist/assets/admin-data.js';
 const words=parseDeck('vocabulary','id,韓国語,日本語,英語\n1015,얼굴,顔,face\n352,다,全部,all\n922,쓰다,書く,write\n1244,있다,ある・いる,be\n9,쓰다,苦い,bitter').cards;
 const header='id_sentence,例文_韓国語,例文_日本語,使用韓国語_main,使用韓国語_3,使用韓国語_1,使用韓国語_4,使用韓国語_2,使用単語ID_main,使用単語ID_3,文中表記_1,文中表記_3,文中表記_4,文中訳_1,文中訳_3,文中訳_4,備考,ジャンル';
 const csv=header+'\ns_1,얼굴에 다 써 있어요.,顔に全部書いてあります。,쓰다,쓰다,얼굴,있다,다,922,922,얼굴에,써,있어요,顔に,書いて,あります（状態が続いている）,非表示メモ,#会話';
+
+test('optional second translation preserves primary content and fixed identity', () => {
+  const original='id_sentence,例文_韓国語,例文_日本語\ns_1,얼굴에 다 써 있어요.,顔に全部書いてあります。';
+  const [before]=parseDeck('sentence',original).cards;
+  const [after]=parseDeck('sentence','訳２,'+original.replace('\ns_1','\n顔に出ています。,s_1')).cards;
+  assert.equal(after.id,before.id);
+  assert.equal(after.han,before.han);
+  assert.equal(after.kanji,before.kanji);
+  assert.equal(after.translation2,'顔に出ています。');
+  assert.deepEqual(answerFields(after,'sentence'),answerFields(before,'sentence'));
+  assert.equal(readingAssessment(after,'顔に全部書いてあります。','sentence').correct,true);
+  assert.equal(readingAssessment(after,'顔に出ています。','sentence').correct,false);
+  assert.equal(before.translation2,'');
+  assert.equal(renderSentenceTranslation2(before),'');
+  assert.equal(renderSentenceTranslation2({translation2:' \n　 '}),'');
+});
+
+test('second translation safely displays CSV punctuation and multiline text', () => {
+  const [card]=parseDeck('sentence','id_sentence,例文_韓国語,例文_日本語,訳2\nsub_1,응?,ん？,"<img src=x> & \\"引用\\"\n二行目"'.replaceAll('\\"','""')).cards;
+  assert.equal(card.translation2,'<img src=x> & "引用"\n二行目');
+  const html=renderSentenceTranslation2(card);
+  assert.ok(html.includes('>訳2</span>'));
+  assert.ok(html.includes('&lt;img src=x&gt; &amp; &quot;引用&quot;\n二行目'));
+  assert.ok(!html.includes('<img'));
+});
 
 test('dedicated sentence columns sort by number while main remains independent', () => {
   const {cards,warnings}=parseDeck('sentence',csv);

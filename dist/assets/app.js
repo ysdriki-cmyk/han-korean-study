@@ -1,6 +1,6 @@
-import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=4';
-import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=2';
-import { renderSentenceWords } from './sentence-view.js';
+import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=5';
+import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=3';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=2';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -275,7 +275,8 @@ function answerRows(card) {
       .filter(field => field.text).map(field => `<div class="answer-row"><span class="answer-label">${field.label}</span><p class="answer-value" lang="${field.lang}">${esc(field.text)}</p></div>`).join('')
     : '';
   const focusWord = activeDeck === 'sentence' ? renderSentenceWords(card, deckData.get('vocabulary')?.cards || []) : '';
-  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + focusWord;
+  const translation2 = activeDeck === 'sentence' ? renderSentenceTranslation2(card) : '';
+  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + translation2 + focusWord;
 }
 function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);

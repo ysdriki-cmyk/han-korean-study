@@ -1,7 +1,13 @@
-import { resolveSentenceWords } from './sentences.js?v=2';
+import { resolveSentenceWords } from './sentences.js?v=3';
 import { speechButton } from './speech-view.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+
+/** Optional reference translation, rendered only inside the revealed answer. */
+export function renderSentenceTranslation2(card) {
+  const text=String(card.translation2 ?? '').trim();
+  return text ? `<div class="answer-row"><span class="answer-label">訳2</span><p class="answer-value" lang="ja">${esc(text)}</p></div>` : '';
+}
 
 export function renderSentenceWords(card, words) {
   const {rows,main}=resolveSentenceWords(card,words);

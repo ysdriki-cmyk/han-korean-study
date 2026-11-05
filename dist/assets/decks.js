@@ -1,7 +1,7 @@
 import {normalizeCards} from './core.js?v=2';
 import {normalizeVocabulary} from './vocabulary.js';
 import {getRecord, migrateLegacy} from './learning.js';
-import {normalizeSentences} from './sentences.js?v=2';
+import {normalizeSentences} from './sentences.js?v=3';
 
 export const DECKS = Object.freeze([
   Object.freeze({id:'vocabulary',label:'単語',subtitle:'韓国語 ↔ 日本語・英語',answerLabel:'日本語・英語',answerShort:'訳',answerKicker:'JAPANESE / ENGLISH',path:'./data/vocabulary.csv',parse:normalizeVocabulary}),
