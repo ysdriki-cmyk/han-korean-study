@@ -88,6 +88,21 @@ test('admin checks share production TOPIK and row exclusion rules and reject unu
   assert.throws(() => inspectContent('vocabulary', 'id,韓国語,日本語\n1,가게,店\n1,가구,家具'), /重複/);
 });
 
+test('conversation metadata columns are documented at their actual CSV cells', () => {
+  const headers = ['id_sentence','例文_韓国語','例文_日本語','セットID','シチュエーション','カテゴリ','カテゴリ番号','ターン','話者','会話の役割','話し方','距離感・対象','学習優先度','使い方メモ','ジャンル'];
+  const row = ['talk-1','안녕하세요.','こんにちは。','daily-001','初対面の挨拶','挨拶','1','1','A','話題開始','丁寧','初対面','A','挨拶する','#conversation'];
+  const data = inspectContent('sentence', headers.join(',') + '\n' + row.join(','));
+  assert.equal(data.count, 1);
+  const byHeader = Object.fromEntries(data.columns.map(column => [column.header, column]));
+  for (const header of headers.slice(3)) {
+    assert.doesNotMatch(byHeader[header].use, /専用の用途を設定していません/);
+    assert.equal(byHeader[header].sample, row[headers.indexOf(header)]);
+  }
+  assert.equal(byHeader['ターン'].cell, 'H1');
+  assert.match(byHeader['セットID'].use, /固定ID/);
+  assert.match(byHeader['ジャンル'].use, /conversation/);
+});
+
 test('local learning summaries expose counts only and ignore malformed or foreign records', () => {
   const summary = summarizeLearning({ version: 3, records: {
     'kanji:1': { assessments: { write: { attempts: 2, history: [{ submitted: 'not exposed' }] }, read: { attempts: 1 } } },

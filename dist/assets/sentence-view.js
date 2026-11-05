@@ -1,4 +1,4 @@
-import { resolveSentenceWords } from './sentences.js?v=3';
+import { resolveSentenceWords } from './sentences.js?v=4';
 import { speechButton } from './speech-view.js';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));

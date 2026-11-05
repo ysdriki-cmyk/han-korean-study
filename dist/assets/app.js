@@ -1,6 +1,6 @@
-import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=5';
-import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=3';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=2';
+import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=6';
+import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=4';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=3';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -16,9 +16,11 @@ import { icon } from './icons.js?v=3';
 import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
 import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
-import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=4';
-import { sentenceCollectionCards } from './sentence-collections.js';
-import { renderStudyHome } from './study-home.js?v=5';
+import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=5';
+import { sentenceCollectionCards } from './sentence-collections.js?v=2';
+import { enrichConversationCards, buildConversationLessons } from './conversations.js';
+import { renderConversationPrompt, renderConversationNotes } from './conversation-view.js';
+import { renderStudyHome } from './study-home.js?v=6';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
@@ -40,10 +42,11 @@ const pageSize = 30;
 let cards = [], records = Object.create(null), view = 'home', activeDeck = 'kanji';
 let selectedSetIds = { kanji: 'essential', vocabulary: 'all', sentence: 'default:all' }, sheetSets = [], categorySheetText = '', sheetSetsLoaded = false;
 let homeQuery = '', homeGroup = 'all', homeSearchTimer;
-let sentenceCollection='core', sentenceSelections={core:'default:all',extra:'all'};
+let sentenceCollection='core', sentenceSelections={core:'default:all',extra:'all',conversation:''};
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
 let sessionCards = [];
+let sessionLesson = null;
 let cardViews = new Map(), advancedPositions = new Set();
 let answers = new Map(), hintSeeds = new Map(), initialCount = 0, sessionScope = 'essential';
 let rankFilter = 'all', page = 0, selected = new Set(), revealedRows = new Set(), pageCards = [];
@@ -110,6 +113,16 @@ function activeStudySet() {
     || (activeDeck === 'sentence' ? projectSentenceSets(availableStudySets('vocabulary')).map(set=>({...set,collection:sentenceCollection})).find(set=>set.id===selectedSetIds.sentence) : undefined);
 }
 function studyCards() { return cardsForStudySet(cards, activeStudySet()); }
+function inConversation() { return activeDeck === 'sentence' && sentenceCollection === 'conversation'; }
+function defaultConversationSet() {
+  const lessons = availableStudySets();
+  return lessons.find(set => cardsForStudySet(cards, set).some(card => !['good','solid'].includes(rank(card)))) || lessons[0];
+}
+function nextConversationSet() {
+  const lessons = availableStudySets();
+  const index = lessons.findIndex(set => set.id === sessionLesson?.id);
+  return index >= 0 ? lessons[index + 1] : null;
+}
 function scopedSettings(candidate = settings) { return { ...candidate, scope: 'all' }; }
 function renderHome() {
   const courses = ['kanji','vocabulary','sentence'].map(id => {
@@ -122,10 +135,12 @@ function renderHome() {
     return { ...set, ...setProgress(members, records, settings.mode), eligibleCount: practicePool(members, records, scopedSettings()).length };
   });
   const extraProgress=setProgress(sentenceCollectionCards(deckData.get('sentence')?.cards || [],'extra'),records,settings.mode);
-  $('#home-view').innerHTML = renderStudyHome({ courses, activeDeck, mode: settings.mode, sets, query: homeQuery, group: homeGroup, sentenceCollection, extraProgress, canResume: !!(answers.size || submitted) && position < session.length });
+  const conversationCards = sentenceCollectionCards(deckData.get('sentence')?.cards || [], 'conversation');
+  const conversationProgress = { ...setProgress(conversationCards, records, settings.mode), lessonCount: buildConversationLessons(conversationCards).length };
+  $('#home-view').innerHTML = renderStudyHome({ courses, activeDeck, mode: settings.mode, sets, query: homeQuery, group: homeGroup, sentenceCollection, extraProgress, conversationProgress, canResume: !!(answers.size || submitted) && position < session.length });
 }
 function switchSentenceCollection(next) {
-  if (!['core','extra'].includes(next) || next===sentenceCollection) return;
+  if (!['core','extra','conversation'].includes(next) || next===sentenceCollection) return;
   sentenceSelections[sentenceCollection]=selectedSetIds.sentence;
   sentenceCollection=next;
   selectedSetIds.sentence=sentenceSelections[next] || 'default:all';
@@ -144,6 +159,11 @@ function chooseStudySet(id, { list = false } = {}) {
   if (!list) speakQuestion();
 }
 function startDefaultPractice() {
+  if (inConversation()) {
+    const lesson = defaultConversationSet();
+    if (lesson) chooseStudySet(lesson.id);
+    return;
+  }
   const all = availableStudySets().find(set => set.kind === 'all');
   // A whole-course session is an explicit action, never a fallback for a missing set.
   const id = all?.id || 'default:all';
@@ -161,23 +181,24 @@ function pool() { return practicePool(studyCards(), records, scopedSettings()); 
 function updateCourseChrome() {
   const deck = getDeck(activeDeck), target = deck.answerLabel;
   $('#open-global-settings').disabled = !loaded;
-  $('.brand strong').textContent = view === 'home' ? '한と漢' : activeDeck === 'kanji' ? '한漢' : deck.label;
+  $('.brand strong').textContent = view === 'home' ? '한と漢' : inConversation() ? 'conversation' : activeDeck === 'kanji' ? '한漢' : deck.label;
   $$('[data-practice-type]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.practiceType === settings.sessionType)));
   $$('[data-mode]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.mode === settings.mode)));
-  $('#settings-course-label').textContent = activeDeck === 'kanji' ? '한漢' : deck.label;
+  $('#settings-course-label').textContent = inConversation() ? 'conversation' : activeDeck === 'kanji' ? '한漢' : deck.label;
+  $('.practice-type-switch').hidden = inConversation();
   $('#read-mode-label').innerHTML = activeDeck === 'sentence' ? '읽기<span class="mode-direction">（한→日）</span>' : activeDeck === 'vocabulary' ? '읽기<span class="mode-direction">（단어→単語）</span>' : '읽기（한→漢）';
   $('#write-mode-label').innerHTML = activeDeck === 'sentence' ? '쓰기<span class="mode-direction">（日→한）</span>' : activeDeck === 'vocabulary' ? '쓰기<span class="mode-direction">（単語→단어）</span>' : '쓰기（漢→한）';
   $('#library-answer-label').textContent = target;
   const searchText = activeDeck === 'sentence' ? '例文・単語を検索' : activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
   $('#library-search').placeholder = searchText; $('#library-search').setAttribute('aria-label', searchText);
-  $('#active-set-label').textContent = `${activeDeck==='sentence' && sentenceCollection==='extra'?'extra · ':''}${activeStudySet()?.label || 'セット未選択'}`;
-  document.title = view === 'home' ? '한と漢 — ホーム' : `한と漢 — ${activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}`;
+  $('#active-set-label').textContent = `${activeDeck==='sentence' && sentenceCollection!=='core'?`${sentenceCollection} · `:''}${activeStudySet()?.label || 'セット未選択'}`;
+  document.title = view === 'home' ? '한と漢 — ホーム' : `한と漢 — ${inConversation() ? 'conversation' : activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}`;
 }
 function renderOverview() {
   const members = studyCards(), totals = counts(), mastered = totals.good + totals.solid;
   $('#nav-count').textContent = members.length.toLocaleString('ja-JP');
   $('#library-total').textContent = members.length.toLocaleString('ja-JP');
-  $('#library-title').textContent = `${activeDeck==='sentence' && sentenceCollection==='extra'?'extra · ':''}${activeStudySet()?.label || 'カード一覧'}`;
+  $('#library-title').textContent = `${activeDeck==='sentence' && sentenceCollection!=='core'?`${sentenceCollection} · `:''}${activeStudySet()?.label || 'カード一覧'}`;
   $('#settled-count').textContent = mastered.toLocaleString('ja-JP');
   $('#settled-percent').textContent = `${members.length ? Math.round(mastered / members.length * 100) : 0}%`;
   $('#rank-distribution').innerHTML = STATUSES.filter(item => totals[item.id]).map(item => `<span class="rating-${item.id}" style="width:${totals[item.id] / members.length * 100}%;background:var(--rating-line)" title="${esc(item.symbol)} ${totals[item.id]}枚"></span>`).join('');
@@ -190,7 +211,7 @@ function renderOverview() {
 }
 function renderSessionStats() {
   const right = [...answers.values()].filter(answer => answer.passed).length;
-  $('.session-label').textContent = settings.sessionType === 'review' ? '復習' : activeDeck === 'kanji' && sessionScope === 'essential' ? '1周目' : '進捗';
+  $('.session-label').textContent = sessionLesson ? 'レッスン' : settings.sessionType === 'review' ? '復習' : activeDeck === 'kanji' && sessionScope === 'essential' ? '1周目' : '進捗';
   $('#session-done').textContent = answers.size; $('#session-total').textContent = session.length;
   $('#session-score').textContent = `${settings.mode === 'write' ? '正解' : '○・◎'} ${right}`;
   $('#session-progress').style.width = `${session.length ? answers.size / session.length * 100 : 0}%`;
@@ -207,13 +228,17 @@ function renderSettings() {
   const totals = Object.fromEntries(STATUSES.map(item => [item.id, 0]));
   scopedCards.forEach(card => { totals[rank(card)] += 1; });
   const common = settingsTarget === 'common';
+  const lesson = inConversation() && !common;
   const reviewing = !common && draftSettings.sessionType === 'review';
   $$('[data-settings-target]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.settingsTarget === settingsTarget)); });
   $('[data-settings-target="course"]').textContent = `${activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}のみ`;
-  $('#settings-normal-presets').hidden = reviewing;
-  $('#settings-normal-ratings').hidden = reviewing;
-  $('#settings-advanced').hidden = reviewing;
-  $('#settings-review-period').hidden = !reviewing && !common;
+  $('#settings-normal-presets').hidden = reviewing || lesson;
+  $('#settings-normal-ratings').hidden = reviewing || lesson;
+  $('#settings-advanced').hidden = reviewing || lesson;
+  $('#settings-review-period').hidden = lesson || (!reviewing && !common);
+  $('#settings-limit-section').hidden = lesson;
+  $('#settings-order-section').hidden = lesson;
+  $('#conversation-settings-note').hidden = !inConversation();
   $('#settings-review-days').innerHTML = choiceButtons('reviewDays', [[1,'24時間'],[7,'7日'],[30,'30日'],[0,'履歴すべて']]);
   const presets = [{id:'default', label:'未演習・❌以下', ratings:['hard','again','unseen']}, {id:'all', label:'すべて', ratings:STATUSES.map(item => item.id)}, {id:'weak', label:'苦手を集中', ratings:['hard','again','unsure']}, {id:'new', label:'未演習から', ratings:['unseen']}];
   $('#settings-presets').innerHTML = presets.map(item => `<button type="button" class="preset-button" data-preset="${item.id}" aria-pressed="${!draftSettings.recentMistakesDays && !draftSettings.excludeRecentDays && item.ratings.length === draftSettings.ratings.length && item.ratings.every(id => draftSettings.ratings.includes(id))}">${item.label}</button>`).join('');
@@ -226,13 +251,13 @@ function renderSettings() {
   $('#settings-order').innerHTML = choiceButtons('shuffle', [[true,`${icon('shuffle')}ランダム`],[false,`${icon('layers')}順番に`]]);
   $('#settings-mistakes').innerHTML = choiceButtons('recentMistakesDays', [[0,'指定しない'],[7,'1週間'],[14,'2週間'],[30,'1か月'],[90,'3か月']]);
   $('#settings-recent').innerHTML = choiceButtons('excludeRecentDays', [[0,'除外しない'],[3,'3日以内'],[7,'1週間以内'],[14,'2週間以内'],[30,'1か月以内'],[90,'3か月以内']]);
-  const matching = practicePool(studyCards(), records, scopedSettings(draftSettings)).length;
-  const amount = draftSettings.limit === 'all' ? matching : Math.min(matching, Number(draftSettings.limit));
+  const matching = lesson ? studyCards().length : practicePool(studyCards(), records, scopedSettings(draftSettings)).length;
+  const amount = lesson || draftSettings.limit === 'all' ? matching : Math.min(matching, Number(draftSettings.limit));
   $('#settings-match').textContent = matching.toLocaleString('ja-JP');
   $('#settings-match-label').hidden = common;
   $('#settings-common-label').hidden = !common;
   $('#save-settings').hidden = common;
-  $('#apply-settings').textContent = common ? '設定を保存' : amount ? `${amount.toLocaleString('ja-JP')}枚で始める` : '対象がありません';
+  $('#apply-settings').textContent = common ? '設定を保存' : amount ? lesson ? 'レッスンを開始' : `${amount.toLocaleString('ja-JP')}枚で始める` : '対象がありません';
   $('#apply-settings').disabled = !common && !amount;
 }
 
@@ -242,8 +267,16 @@ function speakQuestion() {
 function startSession(custom = null, { all = false, autoplay = false } = {}) {
   composing = false; compositionEndedAt = 0;
   sessionCards = cards;
-  const eligible = (custom ?? pool()).filter(card => settings.sessionType === 'review' || !mistakeCoolingDown(card, records, settings.mode));
-  session = makePracticeSession(eligible, records, { ...settings, limit: all ? 'all' : settings.limit });
+  sessionLesson = null;
+  if (inConversation()) {
+    if (activeStudySet()?.kind !== 'conversation') selectedSetIds.sentence = defaultConversationSet()?.id || '';
+    sessionLesson = buildConversationLessons(studyCards()).find(lesson => lesson.id === selectedSetIds.sentence) || null;
+    // A dialogue is the unit of practice. Never shuffle, trim or omit its turns.
+    session = sessionLesson ? [...sessionLesson.cards] : [];
+  } else {
+    const eligible = (custom ?? pool()).filter(card => settings.sessionType === 'review' || !mistakeCoolingDown(card, records, settings.mode));
+    session = makePracticeSession(eligible, records, { ...settings, limit: all ? 'all' : settings.limit });
+  }
   initialCount = session.length; sessionScope = activeStudySet()?.kind === 'essential' ? 'essential' : 'all';
   hintSeeds = new Map(session.map(card => [card.id, Math.floor(Math.random() * Math.max(1, kanjiPromptChoices(card).length))]));
   position = 0; revealed = false; writeResult = null; submitted = ''; answers = new Map(); cardViews = new Map(); advancedPositions = new Set();
@@ -277,7 +310,7 @@ function answerRows(card) {
     : '';
   const focusWord = activeDeck === 'sentence' ? renderSentenceWords(card, deckData.get('vocabulary')?.cards || []) : '';
   const translation2 = activeDeck === 'sentence' ? renderSentenceTranslation2(card) : '';
-  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + translation2 + focusWord;
+  return main + (alternatives.length ? `<div class="answer-row"><span class="answer-label">別の対応</span><p class="answer-value" lang="ko">${alternatives.map(answer => `<span class="spoken-alternative">${esc(answer)}${speechButton(answer)}</span>`).join('')}</p></div>` : '') + otherHints + wordNotes + translation2 + focusWord + (inConversation() ? renderConversationNotes(card) : '');
 }
 function currentKanjiHint(card) {
   const hints = kanjiPromptChoices(card);
@@ -334,10 +367,14 @@ function renderCard() {
   actions += cardNavigation();
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label>${activeDeck === 'sentence' ? `<textarea id="hangul-input" rows="3" placeholder="韓国語の例文を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(submitted)}</textarea>` : `<input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}">`}</form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div><div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card, findWordKanjiReferences(wordKanjiReferences, card.han)) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
+  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div>${sessionLesson ? renderConversationPrompt(sessionLesson, position) : ''}<div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card, findWordKanjiReferences(wordKanjiReferences, card.han)) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;
+  if (sessionLesson) {
+    el.innerHTML = `<div class="complete-state"><h2>レッスン完了</h2><p>${esc(sessionLesson.label)} · ${session.length}発話</p><div class="complete-actions"><button class="button secondary previous-button" data-action="previous">${icon('arrow')}前へ</button><button class="button secondary" data-view="home">レッスン一覧</button>${nextConversationSet() ? '<button class="button primary" data-action="next-set">次のレッスン →</button>' : ''}</div></div>`;
+    return;
+  }
   el.innerHTML = `<div class="complete-state"><h2>セット完了</h2><p>${initialCount}枚${session.length > initialCount ? `＋復習${session.length - initialCount}回` : ''} / ${session.length}回中 ${right}枚${settings.mode === 'write' ? '正解' : 'が○・◎'}</p><div class="complete-actions"><button class="button secondary previous-button" data-action="previous">${icon('arrow')}前へ</button><button class="button secondary" data-view="home">セット一覧</button><button class="button primary" data-action="next-set">次のセット</button></div></div>`;
 }
 function reveal() {
@@ -429,6 +466,7 @@ function renderLibrary() {
 function updateSelection() {
   const present = new Set(studyCards().map(card => card.id)); selected = new Set([...selected].filter(id => present.has(id)));
   $('#selection-count').textContent = `${selected.size}枚選択`; $('#queue-selected').disabled = !selected.size;
+  $('#queue-selected').hidden = inConversation();
   $('#open-bulk-rating').disabled = !selected.size; $('#clear-selection').disabled = !selected.size;
   $('#undo-bulk-rating').hidden = !lastBulkRatingEdit || lastBulkRatingEdit.deckId !== activeDeck || lastBulkRatingEdit.mode !== settings.mode;
   $('#select-page').checked = !!pageCards.length && pageCards.every(card => selected.has(card.id));
@@ -475,6 +513,10 @@ function revertBulkRating() {
 }
 function practiceSelected(ids) {
   const selectedCards = studyCards().filter(card => ids.has(card.id)); if (!selectedCards.length) return;
+  if (inConversation()) {
+    selected.clear(); startSession(); setView('study'); renderLibrary(); speakQuestion();
+    return;
+  }
   const reviewing = settings.sessionType === 'review';
   const eligible = reviewing ? practicePool(selectedCards, records, { ...settings, scope: 'all' }) : selectedCards.filter(card => !mistakeCoolingDown(card, records, settings.mode));
   if (!eligible.length) { toast(reviewing ? '選んだカードは、この期間の復習履歴がありません。' : '通常演習では、間違えたカードは2日後から出題します。'); return; }
@@ -493,7 +535,7 @@ function updateSentenceDeck() {
   const sentence=deckData.get('sentence');
   if (!sentence) return;
   const rawCards=sentence.rawCards || sentence.cards;
-  const linked=linkSentenceWords(rawCards,deckData.get('vocabulary')?.cards || []);
+  const linked=linkSentenceWords(enrichConversationCards(rawCards),deckData.get('vocabulary')?.cards || []);
   deckData.set('sentence',{...sentence,rawCards,cards:linked.cards,referenceWarnings:linked.warnings});
   if (activeDeck === 'sentence') cards=linked.cards;
 }
@@ -647,7 +689,9 @@ async function refreshRemote() {
       cacheContent(deck.id, courseConfig(deck.id).csvUrl, result.text, result.fetchedAt);
       trackContent(deck.id, result);
       const contentChanged = result.text !== deckData.get(deck.id)?.text;
-      deckData.set(deck.id, result);
+      // Unchanged responses still refresh diagnostics, while retaining linked words
+      // and conversation grouping added after parsing the original CSV.
+      deckData.set(deck.id, contentChanged ? result : { ...deckData.get(deck.id), source: result.source, fetchedAt: result.fetchedAt });
       if (contentChanged) {
         changed = true;
         if (deck.id === activeDeck) cards = result.cards;
@@ -692,7 +736,12 @@ function handleCardAction(action) {
   else if (action === 'reload') location.reload();
   else if (action === 'reload-examples') retryTopikExamples();
   else if (action === 'settings') openSettings();
-  else if (action === 'next-set') startSession(null, { autoplay: true });
+  else if (action === 'next-set') {
+    if (sessionLesson) {
+      const next = nextConversationSet();
+      if (next) chooseStudySet(next.id); else setView('home');
+    } else startSession(null, { autoplay: true });
+  }
 }
 function bind() {
   document.addEventListener('click', event => {
@@ -790,7 +839,7 @@ function bind() {
   $('#settings-form').onsubmit = event => {
     event.preventDefault();
     if (settingsTarget === 'common') { persistSettings(); return; }
-    if (!practicePool(studyCards(), records, scopedSettings(draftSettings)).length) return;
+    if (!(inConversation() ? studyCards().length : practicePool(studyCards(), records, scopedSettings(draftSettings)).length)) return;
     persistSettings({ start: true });
   };
   $('#library-search').oninput = () => { page = 0; renderLibrary(); };
@@ -828,8 +877,8 @@ async function init() {
   const setPreferences = readJSON(SET_PREF_KEY, null);
   if (setPreferences?.version === 1 && setPreferences.selected && typeof setPreferences.selected === 'object') {
     for (const id of ['kanji','vocabulary','sentence']) if (typeof setPreferences.selected[id] === 'string') selectedSetIds[id] = setPreferences.selected[id];
-    if (setPreferences.sentenceCollection==='extra') sentenceCollection='extra';
-    for(const collection of ['core','extra']) if(typeof setPreferences.sentenceSelections?.[collection]==='string') sentenceSelections[collection]=setPreferences.sentenceSelections[collection];
+    if (['extra','conversation'].includes(setPreferences.sentenceCollection)) sentenceCollection=setPreferences.sentenceCollection;
+    for(const collection of ['core','extra','conversation']) if(typeof setPreferences.sentenceSelections?.[collection]==='string') sentenceSelections[collection]=setPreferences.sentenceSelections[collection];
   }
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
   const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets({initial:true})]);

@@ -1,9 +1,9 @@
 import { parseCSV } from './core.js';
-import { parseDeck } from './decks.js?v=5';
+import { parseDeck } from './decks.js?v=6';
 import { sheetHeader } from './sheet-fields.js';
 import { essentialKanji } from './kanji.js';
 import { examplesFromVocabulary } from './topik.js';
-import { sentencesFromVocabulary } from './sentences.js?v=3';
+import { sentencesFromVocabulary } from './sentences.js?v=4';
 import { parseCategorySheet, CATEGORY_SHEET_HEADERS } from './category-sheet.js';
 
 const common = [
@@ -39,7 +39,18 @@ const fields = {
     {names:['訳2','訳２'],use:'任意の補足訳。읽기・쓰기とも解答後だけ表示。空欄は非表示で、出題・自動採点には使用しない。'},
     {names:['使用韓国語_main'],use:'メイン単語の辞書形。han_wordsを参照し、単語の学習済み判定と文章の優先順に使用。番号欄の順序とは独立。'},
     {names:['使用単語id_main'],use:'メイン単語の固定ID。任意。同表記の別語義や改名時の照合に使用。'},
-    {names:['ジャンル','カテゴリ'],use:'文章セットの分類。#と改行で複数指定可能。'},
+    {names:['ジャンル'],use:'文章セットの分類。#と改行で複数指定可能。#subtitleはextra、#conversationは会話レッスンに分離。会話指定を優先する。'},
+    {names:['セットid'],use:'会話レッスンの固定ID。同じ会話の全発話で同じ値にする。行番号や話者名からは生成しない。'},
+    {names:['シチュエーション'],use:'会話レッスンの表示名。同じセットIDの発話で共通の状況名を入力する。'},
+    {names:['会話カテゴリ','カテゴリ'],use:'会話レッスンのカテゴリ。ジャンルとは別に指定できる任意列。'},
+    {names:['カテゴリ番号'],use:'会話カテゴリの管理用の任意番号。レッスンの並びはセットIDの自然順を使う。'},
+    {names:['ターン'],use:'会話内の発話順。1から始まる整数。正のターンと話者がそろう行もconversationとして識別する。'},
+    {names:['話者'],use:'発話した人の表示。A・Bなど。ターンと合わせて会話を識別し、ID末尾からは推測しない。'},
+    {names:['会話の役割'],use:'質問・返答など発話の役割。任意の会話情報。'},
+    {names:['話し方'],use:'丁寧・タメ口など。任意の会話情報。'},
+    {names:['距離感・対象'],use:'初対面・親しい相手など。任意の会話情報。'},
+    {names:['学習優先度'],use:'編集者が指定する学習上の優先度。会話内のターン順を変更しない。'},
+    {names:['使い方メモ'],use:'任意の会話の使い方・状況メモ。'},
     {names:['備考'],use:'編集メモとして保持。通常の演習画面では非表示。'},
   ],
 };

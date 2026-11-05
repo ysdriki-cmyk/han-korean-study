@@ -194,3 +194,15 @@ body[data-view=home] .workspace-controls { display: none; }
 .study-home .home-collection-nav button { border:1px solid #d7e2f0; border-radius:9px; padding:10px 12px; color:#52647e; background:white; cursor:pointer; font:inherit; font-size:12px; }
 .study-home .home-collection-nav strong { color:#286fc6; font-size:17px; }
 .study-home .home-collection-nav strong span { display:block; color:#748199; font-size:10px; font-weight:400; }
+.study-home .home-collections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 22px; }
+.study-home .home-collections .home-extra-card { min-width: 0; margin-bottom: 0; align-items: center; }
+.study-home .home-collections .home-extra-title { min-width: 0; flex-wrap: wrap; gap: 3px 10px; }
+.study-home .home-collections .home-extra-title > span { color: #748199; font-size: 11px; }
+.study-home .home-extra-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.study-home .home-conversation-card .home-extra-title strong { font-size: 19px; }
+@media (max-width: 700px) {
+  .study-home .home-collections { grid-template-columns: minmax(0, 1fr); gap: 10px; margin-bottom: 20px; }
+  .study-home .home-collections .home-extra-card { padding: 15px 16px; gap: 10px; border-radius: 11px; }
+  .study-home .home-collections .home-extra-title strong { font-size: 18px; }
+  .study-home .home-extra-count { font-size: 11px; }
+}

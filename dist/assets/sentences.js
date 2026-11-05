@@ -1,6 +1,7 @@
 import { normalizeVocabulary, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseCSV } from './core.js';
 import { categoryLabels, sheetHeader } from './sheet-fields.js';
+import { normalizeConversationMetadata } from './conversations.js';
 
 const clean = value => String(value ?? '').normalize('NFC').trim();
 const normalizeAnswer = value => clean(value).normalize('NFKC').toLowerCase().replace(/\s+/gu, '').replace(/[。.!！?？]+$/u, '');
@@ -58,8 +59,12 @@ export function normalizeSentences(text) {
     const sentenceRefs=numbered.map(({position,column})=>({position,korean:clean(row[column]),wordId:value(`使用単語ID_${position}`),surface:value(`文中表記_${position}`),translation:value(`文中訳_${position}`)}))
       .filter(ref=>ref.korean || ref.wordId);
     const tags=value('ジャンル') || value('カテゴリ');
+    const conversation=normalizeConversationMetadata({lessonId:value('セットID'),situation:value('シチュエーション'),
+      category:value('会話カテゴリ') || value('カテゴリ'),categoryNo:value('カテゴリ番号'),turn:value('ターン'),speaker:value('話者'),
+      role:value('会話の役割'),speechStyle:value('話し方'),audience:value('距離感・対象'),priority:value('学習優先度'),usageNote:value('使い方メモ')});
     cards.push({id,han,kanji,hanja:'',meaning:'',english:'',state:'',flagged:false,kind:'sentence',exampleKo:'',exampleJp:'',answerVariants:[],synonyms:'',
-      notes:value('備考'),translation2:value('訳2'),tags,categories:categoryLabels(tags),mainKorean:value('使用韓国語_main'),mainWordId:value('使用単語ID_main'),sentenceRefs});
+      notes:value('備考'),translation2:value('訳2'),tags,categories:categoryLabels(tags),mainKorean:value('使用韓国語_main'),mainWordId:value('使用単語ID_main'),sentenceRefs,
+      ...(Object.keys(conversation).length ? {conversation} : {})});
   }
   return {cards,warnings,excludedRows};
 }

@@ -14,11 +14,12 @@
   <link rel="stylesheet" href="./assets/topik.css?v=10">
   <link rel="stylesheet" href="./assets/speech.css?v=1">
   <link rel="stylesheet" href="./assets/navigation.css?v=3">
-  <link rel="stylesheet" href="./assets/study-home.css?v=5">
+  <link rel="stylesheet" href="./assets/study-home.css?v=6">
   <link rel="stylesheet" href="./assets/sentences.css?v=3">
+  <link rel="stylesheet" href="./assets/conversation.css?v=1">
   <link rel="stylesheet" href="./assets/library.css?v=1">
   <script src="./assets/config.js?v=5" defer></script>
-  <script type="module" src="./assets/app.js?v=45"></script>
+  <script type="module" src="./assets/app.js?v=46"></script>
 </head>
 <body data-view="home">
 <a class="skip-link" href="#main">演習へ移動</a>
@@ -89,12 +90,13 @@
   </div>
 
       <div id="settings-target" class="settings-target" role="group" aria-label="設定の適用先"><button type="button" data-settings-target="common" aria-pressed="true">すべて共通</button><button type="button" data-settings-target="course" aria-pressed="false">この教材のみ</button></div>
+      <p id="conversation-settings-note" class="conversation-settings-note" hidden>conversationは会話順に、1レッスンずつ進みます。</p>
       <section id="settings-normal-presets" class="settings-section"><div id="settings-presets" class="settings-presets" role="group" aria-label="出題セット"></div></section>
       <section id="settings-scope-section" class="settings-section"><h3>出題範囲</h3><div id="settings-scope" class="choice-row" role="group" aria-label="出題範囲"></div></section>
       <section id="settings-normal-ratings" class="settings-section"><h3>評価から選ぶ</h3><div id="settings-ratings" class="rating-grid" role="group" aria-label="出題する評価"></div></section>
       <section id="settings-review-period" class="settings-section" hidden><h3>復習期間</h3><div id="settings-review-days" class="choice-row" role="group" aria-label="復習する履歴の期間"></div></section>
-      <section class="settings-section"><h3>何枚やる？</h3><div id="settings-limit" class="choice-row" role="group" aria-label="出題枚数"></div></section>
-      <section class="settings-section"><h3>出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
+      <section id="settings-limit-section" class="settings-section"><h3>何枚やる？</h3><div id="settings-limit" class="choice-row" role="group" aria-label="出題枚数"></div></section>
+      <section id="settings-order-section" class="settings-section"><h3>出題順</h3><div id="settings-order" class="choice-row" role="group" aria-label="出題順"></div></section>
       <details id="settings-advanced" class="settings-advanced"><summary>詳細設定</summary>
         <label class="check-label due-toggle"><input id="settings-due" type="checkbox" checked>復習日が来た△・○・◎も出す</label>
         <h3>過去に間違えたカード</h3><div id="settings-mistakes" class="choice-row" role="group" aria-label="間違えた期間"></div>

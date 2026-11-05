@@ -2,7 +2,8 @@ import { essentialKanji } from './kanji.js';
 import { categoryLabels } from './sheet-fields.js';
 import { ratingFor } from './assessment.js';
 import { practiceCount } from './practice.js';
-import { sentenceCollectionCards } from './sentence-collections.js';
+import { sentenceCollectionCards } from './sentence-collections.js?v=2';
+import { buildConversationLessons, conversationLessonCards } from './conversations.js';
 
 const DECKS = new Set(['kanji', 'vocabulary', 'sentence']);
 const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory', 'mainKorean']);
@@ -64,7 +65,7 @@ function normalizeCustomSet(value, deckId) {
   }
   const base = { id: value.id, label, group: value.source === 'sheet' ? 'セット' : 'カスタム', kind: value.kind, deckId, ...metadata };
   if (value.collection != null) {
-    if (deckId !== 'sentence' || !['core','extra'].includes(value.collection)) return null;
+    if (deckId !== 'sentence' || !['core','extra','conversation'].includes(value.collection)) return null;
     base.collection=value.collection;
   }
   if (value.kind === 'all' && value.source === 'sheet') {
@@ -97,6 +98,12 @@ export function normalizeCustomSets(value, deckId) {
 export function buildStudySets(deckId, cards, customSets = [], {collection='core'} = {}) {
   if (!DECKS.has(deckId)) return [];
   const source = deckId==='sentence' ? sentenceCollectionCards(deckCards(cards,deckId),collection) : deckCards(cards, deckId);
+  if (deckId === 'sentence' && collection === 'conversation') {
+    return buildConversationLessons(source).map(lesson => ({
+      id: lesson.id, sourceId: lesson.sourceId, label: lesson.label, group: lesson.category || '会話',
+      kind: 'conversation', deckId, collection,
+    }));
+  }
   const sets = [{ id: 'all', label: 'すべて', group: '基本', kind: 'all', deckId }];
   if (deckId === 'kanji') {
     sets.push({ id: 'essential', label: '必須漢字', group: '基本', kind: 'essential', deckId });
@@ -144,6 +151,9 @@ function matchesRule(card, rule) {
 export function cardsForStudySet(cards, set) {
   if (!object(set) || !DECKS.has(set.deckId)) return [];
   const source = set.deckId==='sentence' ? sentenceCollectionCards(deckCards(cards,set.deckId),set.collection || 'core') : deckCards(cards, set.deckId);
+  if (set.kind === 'conversation' && set.deckId === 'sentence' && set.collection === 'conversation') {
+    return conversationLessonCards(source, set.id);
+  }
   if (set.kind === 'sentence' && set.deckId === 'sentence' && set.sourceSet?.deckId === 'vocabulary') {
     const words = source.flatMap(card => card.sourceWords || (card.sourceWord ? [card.sourceWord] : []));
     const included = new Set(cardsForStudySet(words, set.sourceSet).map(card => card.id));
