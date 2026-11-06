@@ -4,6 +4,9 @@
 .flashcard[data-mode=write] .write-form textarea:focus { outline: 2px solid #84b4f4; outline-offset: 2px; }
 .sentence-answer .answer-value.hangul { font-size: clamp(20px, 3vw, 27px); line-height: 1.8; }
 .sentence-word { margin: 18px 0 12px; padding-top: 16px; border-top: 1px solid #e5eaf1; }
+.sentence-reference { padding: 20px 28px 24px; border-top: 1px solid #e5eaf1; }
+.sentence-reference .sentence-word { margin: 0; padding: 0; border: 0; }
+.sentence-reference .conversation-notes:first-child { padding-top: 0; }
 .sentence-word h3 { margin: 0 0 10px; font-size: 13px; color: #64748b; font-weight: 600; }
 .sentence-word .table-wrap { border: 1px solid #e0e7f0; border-radius: 9px; overflow: hidden; }
 .sentence-word table { width: 100%; table-layout: fixed; border-collapse: collapse; }
@@ -12,6 +15,7 @@
 .sentence-word td[lang=ko] { font-size: 17px; font-weight: 600; }
 .sentence-word .speech-button { display: inline-flex; vertical-align: middle; }
 @media (max-width: 600px) {
+  .sentence-reference { padding: 18px 20px 22px; }
   .sentence-word th, .sentence-word td { padding: 10px 8px; font-size: 12px; }
   .sentence-word td[lang=ko] { font-size: 15px; }
   .flashcard[data-mode=write] .write-form textarea { font-size: 17px; }
