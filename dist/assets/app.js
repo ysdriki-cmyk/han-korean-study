@@ -1,6 +1,6 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=7';
 import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=5';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=4';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=5';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -20,7 +20,7 @@ import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } fr
 import { sentenceCollectionCards } from './sentence-collections.js?v=2';
 import { enrichConversationCards, buildConversationLessons } from './conversations.js?v=2';
 import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, randomConversationLesson } from './conversation-filters.js';
-import { renderConversationPrompt, renderConversationNotes } from './conversation-view.js';
+import { renderConversationSpeaker, renderConversationPrompt, renderConversationNotes } from './conversation-view.js?v=2';
 import { renderStudyHome } from './study-home.js?v=7';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
@@ -384,7 +384,7 @@ function renderCard() {
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label>${activeDeck === 'sentence' ? `<textarea id="hangul-input" rows="3" placeholder="韓国語の例文を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(submitted)}</textarea>` : `<input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}">`}</form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
   const sentenceReference = revealed && activeDeck === 'sentence' ? renderSentenceWords(card, deckData.get('vocabulary')?.cards || []) + (inConversation() ? renderConversationNotes(card) : '') : '';
-  el.innerHTML = `<div class="card-topline">${badge(selectedRating || rank(card))}</div>${sessionLesson ? renderConversationPrompt(sessionLesson, position) : ''}<div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${sentenceReference ? `<div class="sentence-reference">${sentenceReference}</div>` : ''}${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card, findWordKanjiReferences(wordKanjiReferences, card.han)) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
+  el.innerHTML = `<div class="card-topline">${sessionLesson ? renderConversationSpeaker(card) : ''}${badge(selectedRating || rank(card))}</div>${sessionLesson ? renderConversationPrompt(sessionLesson, position) : ''}<div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>` : ''}<div class="card-action-area">${actions}</div>${sentenceReference ? `<div class="sentence-reference">${sentenceReference}</div>` : ''}${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card, findWordKanjiReferences(wordKanjiReferences, card.han)) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
 }
 function renderComplete(el) {
   const right = [...answers.values()].filter(answer => answer.passed).length;

@@ -21,7 +21,5 @@
   .flashcard[data-mode=write] .write-form textarea { font-size: 17px; }
 }
 
-.sentence-main-row { background: #f1f7ff; }
-.sentence-main-row td[lang=ko] { font-weight: 700; }
-.sentence-main-label { display: block; margin-top: 3px; color: #2871d5; font-size: 10px; font-weight: 500; }
+.sentence-main-row { background: #f8fbff; outline: 1px solid #d7e4f5; outline-offset: -1px; }
 .sentence-main-outside { margin: 0 0 12px; color: #667085; font-size: 13px; }
