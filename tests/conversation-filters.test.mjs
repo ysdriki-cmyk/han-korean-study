@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseDeck } from '../dist/assets/decks.js';
 import { enrichConversationCards, buildConversationLessons } from '../dist/assets/conversations.js';
-import { conversationFilterOptions, conversationLessonSearchText, normalizeConversationFilters, filterConversationLessons, randomConversationLesson } from '../dist/assets/conversation-filters.js';
+import { conversationFilterOptions, conversationLessonSearchText, normalizeConversationFilters, filterConversationLessons, unpracticedConversationLessons, randomConversationLesson } from '../dist/assets/conversation-filters.js';
 
 const card = (id, meta) => ({id:`sentence:${id}`,sourceId:id,deckId:'sentence',tags:'#conversation',han:id,kanji:id,conversation:meta});
 const lessons = buildConversationLessons([
@@ -80,6 +80,21 @@ test('shared search text matches field boundaries and utterance-level categories
   assert.deepEqual(ids(filterConversationLessons(source,{query:'誘い 交流'})),['conversation:01']);
   assert.deepEqual(ids(filterConversationLessons(source,{query:'発話側カテゴリ'})),['conversation:01']);
   assert.equal(conversationLessonSearchText(null),'');
+});
+
+test('unpracticed scenes exclude any attempted turn, including unanswered attempts, independently by direction', () => {
+  const records = {
+    [lessons[0].cards[0].id]: { assessments: { read: { rating: 'unseen', attempts: 1 } } },
+    [lessons[1].cards[0].id]: { assessments: { write: { rating: 'good', history: [{correct:true}] } } },
+  };
+  const before = JSON.stringify({lessons,records});
+  assert.deepEqual(ids(unpracticedConversationLessons(lessons, records, 'read')), ['conversation:02','conversation:03']);
+  assert.deepEqual(ids(unpracticedConversationLessons(lessons, records, 'write')), ['conversation:01','conversation:03']);
+  assert.deepEqual(ids(unpracticedConversationLessons(lessons)), ids(lessons));
+  assert.equal(JSON.stringify({lessons,records}), before);
+  const matches = filterConversationLessons(lessons,{filters:{speechStyle:'丁寧'}});
+  assert.equal(randomConversationLesson(unpracticedConversationLessons(matches,records,'read')), null);
+  assert.deepEqual(unpracticedConversationLessons(null), []);
 });
 
 test('random selection is over complete lessons, excludes the current lesson when possible, and never mutates', () => {

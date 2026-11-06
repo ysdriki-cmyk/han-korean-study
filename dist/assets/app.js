@@ -19,9 +19,9 @@ import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
 import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=6';
 import { sentenceCollectionCards } from './sentence-collections.js?v=2';
 import { enrichConversationCards, buildConversationLessons } from './conversations.js?v=2';
-import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, randomConversationLesson } from './conversation-filters.js';
+import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, unpracticedConversationLessons, randomConversationLesson } from './conversation-filters.js?v=2';
 import { renderConversationSpeaker, renderConversationPrompt, renderConversationNotes } from './conversation-view.js?v=2';
-import { renderStudyHome } from './study-home.js?v=7';
+import { renderStudyHome } from './study-home.js?v=8';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
@@ -142,7 +142,8 @@ function renderHome() {
     const lesson = lessonById.get(set.id);
     const members = inConversation() ? lesson?.cards || [] : cardsForStudySet(cards, set);
     const searchText = lesson ? conversationLessonSearchText(lesson) : '';
-    return { ...set, searchText, ...setProgress(members, records, settings.mode), eligibleCount: inConversation() ? members.length : practicePool(members, records, scopedSettings()).length };
+    const progress = setProgress(members, records, settings.mode);
+    return { ...set, searchText, ...progress, unpracticed: progress.attempted === 0, eligibleCount: inConversation() ? members.length : practicePool(members, records, scopedSettings()).length };
   });
   const extraProgress=setProgress(sentenceCollectionCards(deckData.get('sentence')?.cards || [],'extra'),records,settings.mode);
   const conversationCards = sentenceCollectionCards(deckData.get('sentence')?.cards || [], 'conversation');
@@ -171,13 +172,13 @@ function chooseStudySet(id, { list = false } = {}) {
 }
 function startRandomConversationLesson() {
   if (!inConversation()) return;
-  const lesson = randomConversationLesson(matchingConversationLessons(), { excludeId: lastConversationLessonId });
+  const candidates = unpracticedConversationLessons(matchingConversationLessons(), records, settings.mode);
+  const lesson = randomConversationLesson(candidates, { excludeId: lastConversationLessonId });
   if (lesson) chooseStudySet(lesson.id);
 }
 function startDefaultPractice() {
   if (inConversation()) {
-    const lesson = defaultConversationSet();
-    if (lesson) chooseStudySet(lesson.id);
+    startRandomConversationLesson();
     return;
   }
   const all = availableStudySets().find(set => set.kind === 'all');
@@ -779,7 +780,6 @@ function bind() {
     if (target.dataset.sentenceCollection && loaded && activeDeck==='sentence') { switchSentenceCollection(target.dataset.sentenceCollection); return; }
     if (target.dataset.homeMode && loaded) { switchMode(target.dataset.homeMode); return; }
     if (target.hasAttribute('data-start-practice') && loaded) { startDefaultPractice(); return; }
-    if (target.hasAttribute('data-random-lesson') && loaded) { startRandomConversationLesson(); return; }
     if (target.hasAttribute('data-reset-conversation-filters') && inConversation()) {
       conversationFilters = normalizeConversationFilters({}); savePreferences(); renderHome(); return;
     }

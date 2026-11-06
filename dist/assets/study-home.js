@@ -1,4 +1,4 @@
-import { normalizeConversationFilters } from './conversation-filters.js';
+import { normalizeConversationFilters } from './conversation-filters.js?v=2';
 
 const STATUSES = Object.freeze([
   { id: 'solid', symbol: '◎', label: '完璧' },
@@ -112,12 +112,13 @@ export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = nul
     : `<div class="home-collections"><button type="button" class="home-extra-card" data-sentence-collection="extra"${!additional.total?' disabled':''} aria-label="extra 追加の例文、${number(additional.total)}枚"><span class="home-extra-title"><strong>extra</strong><span>追加の例文</span></span><span class="home-extra-count">${number(additional.total)}枚 <span aria-hidden="true">→</span></span>${distribution(additional,'extra',true)}</button><button type="button" class="home-extra-card home-conversation-card" data-sentence-collection="conversation"${!dialogue.total?' disabled':''} aria-label="conversation 会話レッスン、${number(conversationProgress.lessonCount)}レッスン、${number(dialogue.total)}発話"><span class="home-extra-title"><strong>conversation</strong><span>会話レッスン</span></span><span class="home-extra-count">${number(conversationProgress.lessonCount)}レッスン <span aria-hidden="true">→</span></span>${distribution(dialogue,'conversation',true,'発話')}</button></div>`;
   const collectionTitle=conversation?'conversation':extra?'extra':selectedCourse?.label ?? (activeDeck === 'vocabulary' ? '単語' : '한漢');
   const itemLabel=conversation?'レッスン':'セット';
-  const canStart=available && (!extra || additional.total) && (!conversation || filteredSets.some(set => progressFor(set).total));
+  const canStart=available && (!extra || additional.total) && (!conversation || filteredSets.some(set => progressFor(set).total && set.unpracticed !== false));
+  const noUnpracticed=conversation && available && filteredSets.some(set => progressFor(set).total) && !canStart;
   const searchLabel=conversation?'場面・使い方メモを検索':`${itemLabel}を検索`;
   return `<div class="study-home">
     <h1 class="sr-only">ホーム</h1>
     <div class="home-courses" role="group" aria-label="教材を選ぶ">${courses.map(course => courseCard(course, activeDeck)).join('')}</div>
-    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" data-start-practice${canStart ? '' : ' disabled'}>${conversation?'レッスンを開始する':extra?'extraの演習を開始する':'演習を開始する'}<span aria-hidden="true">→</span></button>${conversation ? `<button type="button" class="home-button home-button-secondary home-random-lesson" data-random-lesson${canStart ? '' : ' disabled'}>ランダムに開始<span aria-hidden="true">↗</span></button>` : ''}${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
+    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" ${conversation ? 'title="未演習のシーンをランダムに選んで開始" ' : ''}data-start-practice${canStart ? '' : ' disabled'}>${conversation?(noUnpracticed?'未演習のシーンはありません':'レッスンを開始する'):extra?'extraの演習を開始する':'演習を開始する'}<span aria-hidden="true">→</span></button>${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
     ${collectionEntry}
     <section class="home-sets" aria-labelledby="home-sets-title">
       <div class="home-sets-heading"><h2 id="home-sets-title">${esc(collectionTitle)}<span>の${itemLabel}</span></h2><div class="home-mode-switch" role="group" aria-label="演習モード">${modes.map(item => `<button type="button" data-home-mode="${item.id}" aria-pressed="${selectedMode === item.id}" title="${esc(item.direction)}"><strong lang="ko">${item.label}</strong><span>${esc(item.direction)}</span></button>`).join('')}</div></div>

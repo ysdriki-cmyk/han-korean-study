@@ -1,4 +1,5 @@
 import { categoryLabels } from './sheet-fields.js';
+import { practiceCount } from './practice.js?v=18';
 
 const FIELDS = Object.freeze(['speechStyle', 'audience', 'priority', 'role', 'speaker', 'wordTag']);
 const clean = value => typeof value === 'string' ? value.normalize('NFKC').trim() : '';
@@ -66,6 +67,11 @@ export function filterConversationLessons(lessons, { query = '', group = 'all', 
         : key(meta[field]) === key(value));
     });
   });
+}
+
+/** A scene is new only when none of its turns has an attempt in this direction. */
+export function unpracticedConversationLessons(lessons, records = {}, mode = 'read') {
+  return validLessons(lessons).filter(lesson => lesson.cards.every(card => practiceCount(card, records, mode) === 0));
 }
 
 /** Choose uniformly between lessons, with no influence from their turn count. */

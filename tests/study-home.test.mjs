@@ -48,6 +48,18 @@ test('empty conversation entry and lesson launch are disabled', () => {
   assert.ok(render({ sentenceCollection: 'conversation', conversationProgress: progress }).includes('data-start-practice disabled'));
 });
 
+test('the main conversation start requires a new scene while practised lessons stay available individually', () => {
+  const practised = lessons.map(lesson=>({...lesson,unpracticed:false}));
+  const html = render({sentenceCollection:'conversation',sets:practised,canResume:true});
+  assert.ok(html.includes('data-start-practice disabled>未演習のシーンはありません'));
+  assert.ok(html.includes('data-resume-study'));
+  assert.ok(html.includes('data-start-set="conversation:01-01"'));
+  assert.ok(!html.includes('data-start-set="conversation:01-01" disabled'));
+  assert.ok(!html.includes('data-random-lesson'));
+  const mixed = render({sentenceCollection:'conversation',sets:[practised[0],{...lessons[1],unpracticed:true}]});
+  assert.ok(mixed.includes('data-start-practice>レッスンを開始する'));
+});
+
 test('conversation lesson labels, groups and identifiers are escaped', () => {
   const html = render({ sentenceCollection: 'conversation', sets: [{ ...lessons[0], label: '<img src=x>', group: '" onfocus="alert(1)', id: 'conversation:01" onclick="bad' }] });
   assert.equal(html.includes('<img src=x>'), false);
@@ -55,10 +67,11 @@ test('conversation lesson labels, groups and identifiers are escaped', () => {
   assert.ok(html.includes('data-start-set="conversation:01&quot; onclick=&quot;bad"'));
 });
 
-test('conversation exposes collapsed metadata selectors and a lesson-level random action', () => {
+test('conversation exposes collapsed metadata selectors and one lesson-level start action', () => {
   const html = render({ sentenceCollection:'conversation', sets:lessons,
     conversationFilterOptions:{speechStyle:['丁寧','タメ口'],audience:['初対面〜知人'],priority:['A','B'],role:['返答'],speaker:['A','B'],wordTag:[]} });
-  assert.ok(html.includes('data-random-lesson>ランダムに開始'));
+  assert.ok(html.includes('data-start-practice>レッスンを開始する'));
+  assert.ok(!html.includes('data-random-lesson'));
   assert.ok(html.includes('data-conversation-details>'));
   assert.ok(!html.includes('data-conversation-details open'));
   for (const key of ['speechStyle','audience','priority','role','speaker']) assert.ok(html.includes(`data-conversation-filter="${key}"`));
@@ -81,17 +94,16 @@ test('metadata selectors retain escaped choices and expose active conditions wit
   assert.ok(stale.includes('<option value="旧分類" selected>旧分類（対象なし）</option>'));
 });
 
-test('random launch and default lesson launch share visible search and category availability', () => {
+test('random scene launch respects visible search and category availability', () => {
   const enriched = lessons.map((lesson,index)=>({...lesson,searchText:index ? '予定を相談する #travel' : '音声が聞こえるか確かめる'}));
   const found = render({sentenceCollection:'conversation',sets:enriched,query:'予定を相談'});
   assert.ok(found.includes('1 レッスン'));
   assert.ok(found.includes('data-start-set="conversation:02-01"'));
-  assert.ok(found.includes('data-random-lesson>ランダムに開始'));
+  assert.ok(found.includes('data-start-practice>レッスンを開始する'));
   const empty = render({sentenceCollection:'conversation',sets:enriched,query:'予定',group:'初対面・挨拶'});
   assert.ok(empty.includes('data-start-practice disabled'));
-  assert.ok(empty.includes('data-random-lesson disabled'));
   const noData = render({sentenceCollection:'conversation',sets:[{...lessons[0],count:0}]});
-  assert.ok(noData.includes('data-random-lesson disabled'));
+  assert.ok(noData.includes('data-start-practice disabled'));
 });
 
 test('saved filter spelling variants select the available normalized option without a stale warning', () => {
@@ -110,11 +122,10 @@ test('conversation search uses the canonical joined text without duplicate bound
   const sets = [{...lessons[0],label:'音声確認',group:'電話',searchText:'音声確認 電話 初めての音声通話'}];
   const found = render({sentenceCollection:'conversation',sets,query:'音声確認 電話'});
   assert.ok(found.includes('1 レッスン'));
-  assert.ok(found.includes('data-random-lesson>ランダムに開始'));
+  assert.ok(found.includes('data-start-practice>レッスンを開始する'));
   const absent = render({sentenceCollection:'conversation',sets,query:'電話 音声確認'});
   assert.ok(absent.includes('0 レッスン'));
   assert.ok(absent.includes('data-start-practice disabled'));
-  assert.ok(absent.includes('data-random-lesson disabled'));
   assert.ok(!absent.includes('data-start-set="conversation:01-01"'));
   const fallback = render({sentenceCollection:'conversation',sets:lessons,query:'音声の確認 初対面'});
   assert.ok(fallback.includes('1 レッスン'));
