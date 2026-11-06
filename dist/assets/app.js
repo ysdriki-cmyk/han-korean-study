@@ -208,7 +208,8 @@ function updateCourseChrome() {
   $('#library-answer-label').textContent = target;
   const searchText = activeDeck === 'sentence' ? '例文・単語を検索' : activeDeck === 'vocabulary' ? '韓国語・日本語・英語を検索' : 'ハングル・漢字・意味を検索';
   $('#library-search').placeholder = searchText; $('#library-search').setAttribute('aria-label', searchText);
-  $('#active-set-label').textContent = `${activeDeck==='sentence' && sentenceCollection!=='core'?`${sentenceCollection} · `:''}${activeStudySet()?.label || 'セット未選択'}`;
+  $('.study-set-context').hidden = inConversation();
+  $('#active-set-label').textContent = inConversation() ? '' : `${activeDeck==='sentence' && sentenceCollection!=='core'?`${sentenceCollection} · `:''}${activeStudySet()?.label || 'セット未選択'}`;
   document.title = view === 'home' ? '한と漢 — ホーム' : `한と漢 — ${inConversation() ? 'conversation' : activeDeck === 'kanji' ? '한漢' : getDeck(activeDeck).label}`;
 }
 function renderOverview() {
