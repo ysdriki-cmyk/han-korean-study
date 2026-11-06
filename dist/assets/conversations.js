@@ -9,7 +9,7 @@ const numericTurn = value => {
   const number = Number(clean(value).normalize('NFKC'));
   return Number.isSafeInteger(number) && number > 0 ? number : null;
 };
-const stringFields = ['lessonId', 'situation', 'category', 'categoryNo', 'speaker', 'role', 'speechStyle', 'audience', 'priority', 'usageNote'];
+const stringFields = ['lessonId', 'situation', 'category', 'categoryNo', 'speaker', 'role', 'speechStyle', 'audience', 'priority', 'usageNote', 'wordTags'];
 
 /** Missing optional cells must not erase known metadata from an earlier import. */
 export function normalizeConversationMetadata(value = {}) {

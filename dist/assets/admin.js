@@ -1,9 +1,9 @@
-import { DECKS, parseDeck } from './decks.js?v=6';
-import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=6';
+import { DECKS, parseDeck } from './decks.js?v=7';
+import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=7';
 import { readContentSnapshot } from './content-cache.js?v=2';
 import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=3';
 import { nextReviewFor } from './review.js?v=4';
-import { sentenceWordIssues } from './sentences.js?v=4';
+import { sentenceWordIssues } from './sentences.js?v=5';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];

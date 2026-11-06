@@ -114,6 +114,21 @@ test('local learning summaries expose counts only and ignore malformed or foreig
   assert.deepEqual(summarizeLearning({ version: 2, records: {} }), { records: 0, writing: 0, reading: 0 });
 });
 
+test('conversation origin tags and searchable notes are recognized beyond column AA', () => {
+  const headers = ['id_sentence','例文_韓国語','例文_日本語',...Array(23).fill(''),'単語由来タグ','使い方メモ'];
+  const row = ['talk-1','안녕하세요.','こんにちは。',...Array(23).fill(''),'#旅行 #日常','初対面で丁寧に話す'];
+  const data = inspectContent('sentence', headers.join(',') + '\n' + row.join(','));
+  const tags = data.columns.find(column => column.header === '単語由来タグ');
+  const notes = data.columns.find(column => column.header === '使い方メモ');
+  assert.equal(tags.cell, 'AA1');
+  assert.equal(tags.sampleCell, 'AA2');
+  assert.equal(tags.sample, '#旅行 #日常');
+  assert.match(tags.use, /絞り込み/);
+  assert.match(tags.use, /ジャンルとは別/);
+  assert.equal(notes.cell, 'AB1');
+  assert.match(notes.use, /検索対象/);
+});
+
 test('category inspection follows real columns and retains valid definitions with warnings', () => {
   const header = 'カテゴリ名,category_id,教材,対象列,条件,値,条件の結合,表示順';
   const result = inspectCategoryContent(header + '\n必須,required,one,必須,印あり,,AND,1\n不正,bad,word,未知の列,含む,x,AND,2');

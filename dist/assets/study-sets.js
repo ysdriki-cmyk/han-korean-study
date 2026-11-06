@@ -3,7 +3,7 @@ import { categoryLabels } from './sheet-fields.js';
 import { ratingFor } from './assessment.js';
 import { practiceCount } from './practice.js';
 import { sentenceCollectionCards } from './sentence-collections.js?v=2';
-import { buildConversationLessons, conversationLessonCards } from './conversations.js';
+import { buildConversationLessons, conversationLessonCards } from './conversations.js?v=2';
 
 const DECKS = new Set(['kanji', 'vocabulary', 'sentence']);
 const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory', 'mainKorean']);

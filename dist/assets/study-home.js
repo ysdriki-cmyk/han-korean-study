@@ -1,3 +1,5 @@
+import { normalizeConversationFilters } from './conversation-filters.js';
+
 const STATUSES = Object.freeze([
   { id: 'solid', symbol: '◎', label: '完璧' },
   { id: 'good', symbol: '○', label: 'できた' },
@@ -12,6 +14,29 @@ const count = value => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(N
 const number = value => count(value).toLocaleString('ja-JP');
 const percentage = value => Number.isFinite(Number(value)) ? Math.round(Math.max(0, Math.min(100, Number(value)))) : 0;
 const searchValue = value => String(value ?? '').normalize('NFKC').toLocaleLowerCase('ja-JP');
+const CONVERSATION_FILTER_FIELDS = Object.freeze([
+  ['speechStyle', '話し方'], ['audience', '距離感・対象'], ['priority', '学習優先度'],
+  ['role', '会話の役割'], ['speaker', '話者'], ['wordTag', '単語由来タグ'],
+]);
+
+function conversationFilterControls(filters, options, open) {
+  const normalized = normalizeConversationFilters(filters);
+  const active = CONVERSATION_FILTER_FIELDS.filter(([key]) => normalized[key]).length;
+  const fields = CONVERSATION_FILTER_FIELDS.map(([key, label]) => {
+    const optionKey = value => searchValue(normalizeConversationFilters({ [key]: value })[key]).trim();
+    const byValue = new Map();
+    if (Array.isArray(options?.[key])) for (const value of options[key]) {
+      const shown = String(value ?? '').trim(), identity = optionKey(shown);
+      if (identity && !byValue.has(identity)) byValue.set(identity, shown);
+    }
+    const choices = [...byValue.values()];
+    if (!choices.length) return '';
+    const selected = byValue.get(optionKey(normalized[key])) ?? normalized[key];
+    const stale = selected && !choices.includes(selected) ? `<option value="${esc(selected)}" selected>${esc(selected)}（対象なし）</option>` : '';
+    return `<label class="home-conversation-filter" for="conversation-filter-${key}"><span>${label}</span><select id="conversation-filter-${key}" data-conversation-filter="${key}"><option value=""${selected ? '' : ' selected'}>すべて</option>${stale}${choices.map(value => `<option value="${esc(value)}"${value === selected ? ' selected' : ''}>${esc(value)}</option>`).join('')}</select></label>`;
+  }).join('');
+  return `<details id="conversation-filters" class="home-conversation-filters" data-conversation-details${open ? ' open' : ''}><summary>詳細な絞り込み${active ? `<span class="home-filter-count" aria-label="${active}件の条件を選択中">${active}</span>` : ''}</summary><div class="home-conversation-filter-grid">${fields}</div><div class="home-conversation-filter-footer"><button type="button" class="home-filter-reset" data-reset-conversation-filters${active ? '' : ' disabled'}>条件をクリア</button></div></details>`;
+}
 
 function progressFor(source = {}) {
   const total = count(source.total ?? source.count);
@@ -65,11 +90,15 @@ function setRow(set, canCreate) {
 }
 
 /** Render the home screen. The caller owns state, event handling, and the set builder dialog. */
-export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = null, sets = [], query = '', group = 'all', canResume = false, canCreate = false, sentenceCollection='core', extraProgress={}, conversationProgress={} } = {}) {
+export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = null, sets = [], query = '', group = 'all', canResume = false, canCreate = false, sentenceCollection='core', extraProgress={}, conversationProgress={}, conversationFilters={}, conversationFilterOptions={}, conversationDetailsOpen=false } = {}) {
   const selectedCourse = courses.find(course => course.id === activeDeck);
   const available = selectedCourse?.available !== false;
   const normalizedQuery = searchValue(query).trim();
-  const filteredSets = sets.filter(set => (group === 'all' || set.group === group) && (!normalizedQuery || searchValue(`${set.label ?? ''} ${set.group ?? ''}`).includes(normalizedQuery)));
+  const filteredSets = sets.filter(set => {
+    const haystack = activeDeck === 'sentence' && sentenceCollection === 'conversation' && typeof set.searchText === 'string'
+      ? set.searchText : `${set.label ?? ''} ${set.group ?? ''} ${set.searchText ?? ''}`;
+    return (group === 'all' || set.group === group) && (!normalizedQuery || searchValue(haystack).includes(normalizedQuery));
+  });
   const groups = [...new Set([...GROUPS, ...sets.map(set => String(set.group ?? ''))])].filter(Boolean);
   const shownGroups = groups.filter(value => value === group || sets.some(set => set.group === value));
   const modes = [{ id: 'read', label: '읽기', direction: activeDeck === 'sentence' ? '한→日' : activeDeck === 'vocabulary' ? '단어→単語' : '한→漢' }, { id: 'write', label: '쓰기', direction: activeDeck === 'sentence' ? '日→한' : activeDeck === 'vocabulary' ? '単語→단어' : '漢→한' }];
@@ -83,14 +112,17 @@ export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = nul
     : `<div class="home-collections"><button type="button" class="home-extra-card" data-sentence-collection="extra"${!additional.total?' disabled':''} aria-label="extra 追加の例文、${number(additional.total)}枚"><span class="home-extra-title"><strong>extra</strong><span>追加の例文</span></span><span class="home-extra-count">${number(additional.total)}枚 <span aria-hidden="true">→</span></span>${distribution(additional,'extra',true)}</button><button type="button" class="home-extra-card home-conversation-card" data-sentence-collection="conversation"${!dialogue.total?' disabled':''} aria-label="conversation 会話レッスン、${number(conversationProgress.lessonCount)}レッスン、${number(dialogue.total)}発話"><span class="home-extra-title"><strong>conversation</strong><span>会話レッスン</span></span><span class="home-extra-count">${number(conversationProgress.lessonCount)}レッスン <span aria-hidden="true">→</span></span>${distribution(dialogue,'conversation',true,'発話')}</button></div>`;
   const collectionTitle=conversation?'conversation':extra?'extra':selectedCourse?.label ?? (activeDeck === 'vocabulary' ? '単語' : '한漢');
   const itemLabel=conversation?'レッスン':'セット';
+  const canStart=available && (!extra || additional.total) && (!conversation || filteredSets.some(set => progressFor(set).total));
+  const searchLabel=conversation?'場面・使い方メモを検索':`${itemLabel}を検索`;
   return `<div class="study-home">
     <h1 class="sr-only">ホーム</h1>
     <div class="home-courses" role="group" aria-label="教材を選ぶ">${courses.map(course => courseCard(course, activeDeck)).join('')}</div>
-    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" data-start-practice${available && (!extra || additional.total) && (!conversation || dialogue.total) ? '' : ' disabled'}>${conversation?'レッスンを開始する':extra?'extraの演習を開始する':'演習を開始する'}<span aria-hidden="true">→</span></button>${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
+    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" data-start-practice${canStart ? '' : ' disabled'}>${conversation?'レッスンを開始する':extra?'extraの演習を開始する':'演習を開始する'}<span aria-hidden="true">→</span></button>${conversation ? `<button type="button" class="home-button home-button-secondary home-random-lesson" data-random-lesson${canStart ? '' : ' disabled'}>ランダムに開始<span aria-hidden="true">↗</span></button>` : ''}${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
     ${collectionEntry}
     <section class="home-sets" aria-labelledby="home-sets-title">
       <div class="home-sets-heading"><h2 id="home-sets-title">${esc(collectionTitle)}<span>の${itemLabel}</span></h2><div class="home-mode-switch" role="group" aria-label="演習モード">${modes.map(item => `<button type="button" data-home-mode="${item.id}" aria-pressed="${selectedMode === item.id}" title="${esc(item.direction)}"><strong lang="ko">${item.label}</strong><span>${esc(item.direction)}</span></button>`).join('')}</div></div>
-      <div class="home-set-tools"><label class="home-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="set-search" type="search" value="${esc(query)}" aria-label="${itemLabel}を検索" placeholder="${itemLabel}を検索" autocomplete="off"></label>${canCreate ? '<button type="button" class="home-button home-create" data-create-set aria-haspopup="dialog"><span aria-hidden="true">＋</span>セットを作成</button>' : ''}</div>
+      <div class="home-set-tools"><label class="home-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="set-search" type="search" value="${esc(query)}" aria-label="${searchLabel}" placeholder="${searchLabel}" autocomplete="off"></label>${canCreate ? '<button type="button" class="home-button home-create" data-create-set aria-haspopup="dialog"><span aria-hidden="true">＋</span>セットを作成</button>' : ''}</div>
+      ${conversation ? conversationFilterControls(conversationFilters, conversationFilterOptions, conversationDetailsOpen) : ''}
       <div class="home-set-tabs" role="group" aria-label="${itemLabel}の種類"><button type="button" data-set-group="all" aria-pressed="${group === 'all'}">すべて</button>${shownGroups.map(value => `<button type="button" data-set-group="${esc(value)}" aria-pressed="${group === value}">${esc(value)}</button>`).join('')}</div>
       <div class="home-list-heading"><span class="home-set-results">${available ? `${number(filteredSets.length)} ${itemLabel}` : '読み込み中…'}</span><div class="home-legend" aria-label="評価の色">${STATUSES.map(status => `<span class="home-legend-item home-rating-${status.id}" title="${esc(status.label)}" aria-label="${esc(status.symbol)} ${esc(status.label)}"><i aria-hidden="true"></i><span aria-hidden="true">${status.symbol}</span></span>`).join('')}</div></div>
       ${!available ? '<div class="home-empty" role="status"><span class="home-loading-dot" aria-hidden="true"></span><p>学習セットを読み込み中…</p></div>' : filteredSets.length ? `<ul class="home-set-list">${filteredSets.map(set => setRow(set, canCreate)).join('')}</ul>` : `<div class="home-empty" role="status"><p>${query || group !== 'all' ? `該当する${itemLabel}がありません` : `${itemLabel}がありません`}</p>${canCreate && group === 'カスタム' && !query ? '<button type="button" class="home-button home-button-secondary" data-create-set aria-haspopup="dialog">セットを作成</button>' : ''}</div>`}

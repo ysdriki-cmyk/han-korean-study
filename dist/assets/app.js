@@ -1,6 +1,6 @@
-import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=6';
-import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=4';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=3';
+import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=7';
+import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=5';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=4';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -16,11 +16,12 @@ import { icon } from './icons.js?v=3';
 import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
 import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
-import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=5';
+import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=6';
 import { sentenceCollectionCards } from './sentence-collections.js?v=2';
-import { enrichConversationCards, buildConversationLessons } from './conversations.js';
+import { enrichConversationCards, buildConversationLessons } from './conversations.js?v=2';
+import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, randomConversationLesson } from './conversation-filters.js';
 import { renderConversationPrompt, renderConversationNotes } from './conversation-view.js';
-import { renderStudyHome } from './study-home.js?v=6';
+import { renderStudyHome } from './study-home.js?v=7';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
@@ -43,6 +44,7 @@ let cards = [], records = Object.create(null), view = 'home', activeDeck = 'kanj
 let selectedSetIds = { kanji: 'essential', vocabulary: 'all', sentence: 'default:all' }, sheetSets = [], categorySheetText = '', sheetSetsLoaded = false;
 let homeQuery = '', homeGroup = 'all', homeSearchTimer;
 let sentenceCollection='core', sentenceSelections={core:'default:all',extra:'all',conversation:''};
+let conversationFilters = {}, conversationDetailsOpen = false, lastConversationLessonId = '';
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
 let sessionCards = [];
@@ -95,7 +97,7 @@ function savePreferences() {
   preferences.version = 4; preferences.deckId = activeDeck;
   preferences.courses[activeDeck] = { ...preferences.courses[activeDeck], ...settings };
   const saved = safeWrite(PREF_KEY, preferences);
-  const setsSaved = safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds, sentenceCollection, sentenceSelections:{...sentenceSelections,[sentenceCollection]:selectedSetIds.sentence} });
+  const setsSaved = safeWrite(SET_PREF_KEY, { version: 1, selected: selectedSetIds, sentenceCollection, sentenceSelections:{...sentenceSelections,[sentenceCollection]:selectedSetIds.sentence}, conversationFilters });
   return saved && setsSaved;
 }
 function availableStudySets(id = activeDeck) {
@@ -114,30 +116,38 @@ function activeStudySet() {
 }
 function studyCards() { return cardsForStudySet(cards, activeStudySet()); }
 function inConversation() { return activeDeck === 'sentence' && sentenceCollection === 'conversation'; }
+function allConversationLessons() { return buildConversationLessons(deckData.get('sentence')?.cards || []); }
+function matchingConversationLessons() {
+  return filterConversationLessons(allConversationLessons(), { query: homeQuery, group: homeGroup, filters: conversationFilters });
+}
 function defaultConversationSet() {
-  const lessons = availableStudySets();
-  return lessons.find(set => cardsForStudySet(cards, set).some(card => !['good','solid'].includes(rank(card)))) || lessons[0];
+  const lessons = matchingConversationLessons();
+  return lessons.find(lesson => lesson.cards.some(card => !['good','solid'].includes(rank(card)))) || lessons[0];
 }
 function nextConversationSet() {
-  const lessons = availableStudySets();
+  const lessons = matchingConversationLessons();
   const index = lessons.findIndex(set => set.id === sessionLesson?.id);
   return index >= 0 ? lessons[index + 1] : null;
 }
 function scopedSettings(candidate = settings) { return { ...candidate, scope: 'all' }; }
 function renderHome() {
+  const lessons = allConversationLessons(), lessonById = new Map(lessons.map(lesson => [lesson.id, lesson]));
+  const matchingIds = inConversation() ? new Set(filterConversationLessons(lessons, { filters: conversationFilters }).map(lesson => lesson.id)) : null;
   const courses = ['kanji','vocabulary','sentence'].map(id => {
     const raw = deckData.get(id)?.cards || [];
     const source = id==='sentence' ? sentenceCollectionCards(raw,'core') : raw;
     return { id, label: id === 'kanji' ? '한漢' : getDeck(id).label, count: source.length, available: deckData.has(id), progress: setProgress(source, records, settings.mode) };
   });
-  const sets = availableStudySets().map(set => {
-    const members = cardsForStudySet(cards, set);
-    return { ...set, ...setProgress(members, records, settings.mode), eligibleCount: practicePool(members, records, scopedSettings()).length };
+  const sets = availableStudySets().filter(set => !matchingIds || matchingIds.has(set.id)).map(set => {
+    const lesson = lessonById.get(set.id);
+    const members = inConversation() ? lesson?.cards || [] : cardsForStudySet(cards, set);
+    const searchText = lesson ? conversationLessonSearchText(lesson) : '';
+    return { ...set, searchText, ...setProgress(members, records, settings.mode), eligibleCount: inConversation() ? members.length : practicePool(members, records, scopedSettings()).length };
   });
   const extraProgress=setProgress(sentenceCollectionCards(deckData.get('sentence')?.cards || [],'extra'),records,settings.mode);
   const conversationCards = sentenceCollectionCards(deckData.get('sentence')?.cards || [], 'conversation');
-  const conversationProgress = { ...setProgress(conversationCards, records, settings.mode), lessonCount: buildConversationLessons(conversationCards).length };
-  $('#home-view').innerHTML = renderStudyHome({ courses, activeDeck, mode: settings.mode, sets, query: homeQuery, group: homeGroup, sentenceCollection, extraProgress, conversationProgress, canResume: !!(answers.size || submitted) && position < session.length });
+  const conversationProgress = { ...setProgress(conversationCards, records, settings.mode), lessonCount: lessons.length };
+  $('#home-view').innerHTML = renderStudyHome({ courses, activeDeck, mode: settings.mode, sets, query: homeQuery, group: homeGroup, sentenceCollection, extraProgress, conversationProgress, conversationFilters, conversationFilterOptions: conversationFilterOptions(lessons), conversationDetailsOpen, canResume: !!(answers.size || submitted) && position < session.length });
 }
 function switchSentenceCollection(next) {
   if (!['core','extra','conversation'].includes(next) || next===sentenceCollection) return;
@@ -152,11 +162,17 @@ function chooseStudySet(id, { list = false } = {}) {
   const set = availableStudySets().find(item => item.id === id);
   if (!set) return;
   selectedSetIds[activeDeck] = id;
+  if (inConversation() && !list) lastConversationLessonId = id;
   settings.sessionType = 'practice'; settings.scope = 'all';
   selected.clear(); revealedRows.clear(); rankFilter = 'all'; page = 0;
   $('#library-search').value = '';
   savePreferences(); syncSettingsForm(); startSession(); setView(list ? 'library' : 'study');
   if (!list) speakQuestion();
+}
+function startRandomConversationLesson() {
+  if (!inConversation()) return;
+  const lesson = randomConversationLesson(matchingConversationLessons(), { excludeId: lastConversationLessonId });
+  if (lesson) chooseStudySet(lesson.id);
 }
 function startDefaultPractice() {
   if (inConversation()) {
@@ -273,6 +289,7 @@ function startSession(custom = null, { all = false, autoplay = false } = {}) {
     sessionLesson = buildConversationLessons(studyCards()).find(lesson => lesson.id === selectedSetIds.sentence) || null;
     // A dialogue is the unit of practice. Never shuffle, trim or omit its turns.
     session = sessionLesson ? [...sessionLesson.cards] : [];
+    if (sessionLesson && view === 'study') lastConversationLessonId = sessionLesson.id;
   } else {
     const eligible = (custom ?? pool()).filter(card => settings.sessionType === 'review' || !mistakeCoolingDown(card, records, settings.mode));
     session = makePracticeSession(eligible, records, { ...settings, limit: all ? 'all' : settings.limit });
@@ -762,6 +779,10 @@ function bind() {
     if (target.dataset.sentenceCollection && loaded && activeDeck==='sentence') { switchSentenceCollection(target.dataset.sentenceCollection); return; }
     if (target.dataset.homeMode && loaded) { switchMode(target.dataset.homeMode); return; }
     if (target.hasAttribute('data-start-practice') && loaded) { startDefaultPractice(); return; }
+    if (target.hasAttribute('data-random-lesson') && loaded) { startRandomConversationLesson(); return; }
+    if (target.hasAttribute('data-reset-conversation-filters') && inConversation()) {
+      conversationFilters = normalizeConversationFilters({}); savePreferences(); renderHome(); return;
+    }
     if (target.hasAttribute('data-start-set') && loaded) { chooseStudySet(target.dataset.startSet); return; }
     if (target.hasAttribute('data-list-set') && loaded) { chooseStudySet(target.dataset.listSet, { list: true }); return; }
     if (target.hasAttribute('data-set-group')) { homeGroup = target.dataset.setGroup; renderHome(); return; }
@@ -792,6 +813,16 @@ function bind() {
       if (focused) $('#set-search')?.focus({ preventScroll: true });
     }, 140);
   });
+  $('#home-view').addEventListener('change', event => {
+    const field = event.target.dataset.conversationFilter;
+    if (!inConversation() || !Object.hasOwn(normalizeConversationFilters({}), field)) return;
+    conversationFilters = normalizeConversationFilters({ ...conversationFilters, [field]: event.target.value });
+    savePreferences(); renderHome();
+    $(`[data-conversation-filter="${field}"]`)?.focus({ preventScroll: true });
+  });
+  $('#home-view').addEventListener('toggle', event => {
+    if (event.target.id === 'conversation-filters' && event.target.isConnected) conversationDetailsOpen = event.target.open;
+  }, true);
   $('#flashcard').addEventListener('input', event => {
     if (['hangul-input', 'recall-input'].includes(event.target.id)) submitted = event.target.value;
   });
@@ -879,6 +910,8 @@ async function init() {
     for (const id of ['kanji','vocabulary','sentence']) if (typeof setPreferences.selected[id] === 'string') selectedSetIds[id] = setPreferences.selected[id];
     if (['extra','conversation'].includes(setPreferences.sentenceCollection)) sentenceCollection=setPreferences.sentenceCollection;
     for(const collection of ['core','extra','conversation']) if(typeof setPreferences.sentenceSelections?.[collection]==='string') sentenceSelections[collection]=setPreferences.sentenceSelections[collection];
+    conversationFilters = normalizeConversationFilters(setPreferences.conversationFilters);
+    conversationDetailsOpen = Object.values(conversationFilters).some(Boolean);
   }
   syncSettingsForm(); updateCourseChrome(); setView(location.hash.slice(1), { hash: false });
   const results = await Promise.allSettled([...SOURCE_DECKS.map(deck => loadCourse(deck.id)), loadCategorySets({initial:true})]);
