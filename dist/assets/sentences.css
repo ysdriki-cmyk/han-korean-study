@@ -14,10 +14,19 @@
 .sentence-word th { background: #f5f8fc; color: #758196; font-size: 11px; font-weight: 600; }
 .sentence-word td[lang=ko] { font-size: 17px; font-weight: 600; }
 .sentence-word .speech-button { display: inline-flex; vertical-align: middle; }
+.sentence-word thead th:first-child { width: 28%; }
+.sentence-word .sentence-example-row>td { padding: 0 12px 14px; background: #f7faff; }
+.sentence-example-content { padding: 12px 14px; border: 1px solid #e1eaf7; border-radius: 8px; background: #fff; }
+.sentence-example-content h4 { margin: 0 0 10px; color: #758196; font-size: 12px; font-weight: 500; }
+.sentence-linked-example + .sentence-linked-example { margin-top: 14px; padding-top: 14px; border-top: 1px solid #e8edf3; }
+.sentence-linked-example p { margin: 0; font-size: 14px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.sentence-linked-example p[lang=ja] { margin-top: 6px; color: #667085; font-size: 13px; }
 @media (max-width: 600px) {
   .sentence-reference { padding: 18px 20px 22px; }
   .sentence-word th, .sentence-word td { padding: 10px 8px; font-size: 12px; }
   .sentence-word td[lang=ko] { font-size: 15px; }
+  .sentence-word .sentence-example-row>td { padding: 0 8px 10px; }
+  .sentence-example-content { padding: 10px 12px; }
   .flashcard[data-mode=write] .write-form textarea { font-size: 17px; }
 }
 

@@ -55,9 +55,11 @@ test('dedicated sentence columns sort by number while main remains independent',
   assert.deepEqual(result.issues,[]);
   assert.equal(JSON.stringify(cards),before);
   const html=renderSentenceWords(cards[0],words);
-  assert.ok(html.includes('<th scope="col">韓国語</th><th scope="col">原形</th><th scope="col">日本語'));
+  assert.ok(html.includes('<th scope="col">原形</th><th scope="col">英語</th><th scope="col">日本語'));
   assert.equal((html.match(/class="sentence-main-row"/g)||[]).length,1);
-  assert.ok(html.indexOf('얼굴에') < html.indexOf('써'));
+  assert.ok(html.indexOf('얼굴') < html.indexOf('쓰다'));
+  assert.ok(html.includes('write'));
+  assert.ok(!html.includes('얼굴에'));
   assert.ok(!html.includes('非表示メモ'));
   assert.ok(!html.includes('bitter'));
 });
@@ -98,7 +100,7 @@ test('sentence reference text is escaped and inflections are not guessed', () =>
   const html=renderSentenceWords(card,words);
   assert.ok(!html.includes('<script>'));
   assert.ok(!html.includes('<img'));
-  assert.ok(html.includes('&lt;script&gt;'));
+  assert.ok(!html.includes('script'));
   assert.ok(html.includes('&lt;img src=x&gt;'));
 });
 
