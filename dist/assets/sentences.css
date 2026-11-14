@@ -63,6 +63,14 @@
 .word-sheet-pages button { display: inline-flex; align-items: center; justify-content: center; min-width: 48px; min-height: 40px; border: 1px solid #dce6f3; border-radius: 8px; background: #f5f9ff; color: #3079d4; font-size: 18px; }
 .word-sheet-pages button:disabled { opacity: .35; cursor: default; }
 .word-sheet-pages>span { color: #8692a4; font-size: 12px; font-variant-numeric: tabular-nums; }
+#sentence-word-dialog.word-status-dialog { inset: 0; width: min(calc(100% - 32px), 420px); height: fit-content; max-height: calc(100dvh - 32px); margin: auto; border: 1px solid #dce5f1; border-radius: 16px; box-shadow: 0 12px 60px #24375430; }
+.word-status-dialog .word-sheet-heading { padding: 14px 20px 12px; }
+.word-status-dialog .word-sheet-heading h2 { font-size: 21px; }
+.word-status-dialog .word-sheet-body { padding: 16px 20px 12px; }
+.word-status-dialog .word-sheet-status { margin-top: 0; }
+.word-status-dialog .word-sheet-ratings { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.word-status-dialog .word-sheet-ratings button { min-height: 56px; }
+.word-status-dialog .word-sheet-feedback:empty { min-height: 0; margin: 0; }
 @media (max-width: 600px) {
   .sentence-reference { padding: 18px 20px 22px; }
   .sentence-word th, .sentence-word td { padding: 3px 8px; font-size: 12px; }

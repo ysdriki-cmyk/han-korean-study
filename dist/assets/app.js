@@ -1,7 +1,7 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=10';
 import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=8';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=10';
-import { createSentenceWordSheet } from './sentence-word-sheet.js?v=4';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=11';
+import { createSentenceWordSheet } from './sentence-word-sheet.js?v=5';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';

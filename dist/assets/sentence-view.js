@@ -48,14 +48,24 @@ export function sentenceWordExamplePage(row,words,sentences,card,page=0) {
   return {examples:examples.slice(current*2,current*2+2),total:examples.length,page:current,pages};
 }
 
-export function renderSentenceWordSheet(row,words,sentences,card,records,mode,page=0) {
+function renderWordRatings(row,records,mode) {
   const rating=row.word?ratingFor(row.word,records,mode):'unseen';
+  return `<section class="word-sheet-status"><div class="word-sheet-status-heading"><h3>単語のステータス</h3><div class="word-sheet-modes" role="group" aria-label="単語の評価方向">${['read','write'].map(item=>`<button type="button" data-word-sheet-mode="${item}" aria-pressed="${mode===item}">${modeLabel(item)}</button>`).join('')}</div></div>
+    ${row.word?`<div class="word-sheet-ratings" role="group" aria-label="単語のステータスを変更">${statuses.map(item=>`<button type="button" class="rating-${item.id}" data-word-sheet-rating="${item.id}" aria-label="${esc(row.lemma)}を${modeLabel(mode)} ${item.symbol} ${labels[item.id]}に変更" aria-pressed="${rating===item.id}"><span class="rating-symbol">${item.symbol}</span><span>${labels[item.id]}</span></button>`).join('')}</div>`:'<p class="word-sheet-unregistered">単語帳に未登録</p>'}
+    <p class="word-sheet-feedback" role="status" aria-live="polite"></p></section>`;
+}
+
+/** A status tap offers only ratings and never looks up meanings or related examples. */
+export function renderSentenceWordStatus(row,records,mode) {
+  return `<header class="word-sheet-heading"><h2 id="sentence-word-title" lang="ko">${esc(row.lemma)}</h2><button type="button" class="icon-button" data-word-sheet-close aria-label="評価の選択を閉じる">×</button></header>
+    <div class="word-sheet-body">${renderWordRatings(row,records,mode)}</div>`;
+}
+
+export function renderSentenceWordSheet(row,words,sentences,card,records,mode,page=0) {
   const examples=sentenceWordExamplePage(row,words,sentences,card,page);
   return `<div class="word-sheet-handle" aria-hidden="true"></div><header class="word-sheet-heading"><div><h2 id="sentence-word-title" lang="ko">${esc(row.lemma)}</h2>${speechButton(row.lemma)}</div><button type="button" class="icon-button" data-word-sheet-close aria-label="単語パネルを閉じる">×</button></header>
     <div class="word-sheet-body"><div class="word-sheet-meaning"><p lang="ja">${esc(row.japanese)||'—'}</p>${row.english?`<p lang="en">${esc(row.english)}</p>`:''}</div>
-    <section class="word-sheet-status"><div class="word-sheet-status-heading"><h3>単語のステータス</h3><div class="word-sheet-modes" role="group" aria-label="単語の評価方向">${['read','write'].map(item=>`<button type="button" data-word-sheet-mode="${item}" aria-pressed="${mode===item}">${modeLabel(item)}</button>`).join('')}</div></div>
-    ${row.word?`<div class="word-sheet-ratings" role="group" aria-label="単語のステータスを変更">${statuses.map(item=>`<button type="button" class="rating-${item.id}" data-word-sheet-rating="${item.id}" aria-label="${esc(row.lemma)}を${modeLabel(mode)} ${item.symbol} ${labels[item.id]}に変更" aria-pressed="${rating===item.id}"><span class="rating-symbol">${item.symbol}</span><span>${labels[item.id]}</span></button>`).join('')}</div>`:'<p class="word-sheet-unregistered">単語帳に未登録</p>'}
-    <p class="word-sheet-feedback" role="status" aria-live="polite"></p></section>
+    ${renderWordRatings(row,records,mode)}
     <section class="word-sheet-examples"><h3>他の例文 <span>${examples.total}件</span></h3>${examples.examples.length?examples.examples.map(example=>`<div class="sentence-linked-example">${example.korean?`<p lang="ko">${esc(example.korean)}${speechButton(example.korean)}</p>`:''}${example.japanese?`<p lang="ja">${esc(example.japanese)}</p>`:''}</div>`).join(''):'<p class="word-sheet-empty">他の例文はまだありません</p>'}</section></div>
     <footer class="word-sheet-pages"${examples.pages===1?' hidden':''}><button type="button" data-word-sheet-page="${examples.page-1}" aria-label="前の例文"${examples.page===0?' disabled':''}>←</button><span>${examples.page+1} / ${examples.pages}</span><button type="button" data-word-sheet-page="${examples.page+1}" aria-label="次の例文"${examples.page===examples.pages-1?' disabled':''}>→</button></footer>`;
 }

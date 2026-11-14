@@ -1,9 +1,12 @@
-import { sentenceWordEntries, renderSentenceWordSheet } from './sentence-view.js?v=10';
+import { sentenceWordEntries, renderSentenceWordSheet, renderSentenceWordStatus } from './sentence-view.js?v=11';
 
 /** Native modal focus trapping, scoped rating edits and example paging. */
 export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopSpeech}) {
   let selected=null;
   const content=dialog.querySelector('#sentence-word-sheet');
+  const render=context=>selected.status
+    ? renderSentenceWordStatus(context.entry,context.records,context.mode)
+    : renderSentenceWordSheet(context.entry,context.words,context.sentences,context.card,context.records,context.mode,selected.page);
 
   function current() {
     const context=getContext();
@@ -16,7 +19,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     const context=current();
     if(!context){close();return;}
     const scroll=content.querySelector('.word-sheet-body')?.scrollTop||0;
-    content.innerHTML=renderSentenceWordSheet(context.entry,context.words,context.sentences,context.card,context.records,context.mode,selected.page);
+    content.innerHTML=render(context);
     const body=content.querySelector('.word-sheet-body');
     body.scrollTop=resetScroll?0:scroll;
     if(focus)content.querySelector(focus)?.focus({preventScroll:true});
@@ -28,8 +31,9 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     if(!entry || status && !entry.word)return;
     stopSpeech();
     selected={cardId:context.card.id,key:entry.key,index,page:0,status};
+    dialog.classList.toggle('word-status-dialog',status);
     // Build the title before showModal so its accessible name is available immediately.
-    content.innerHTML=renderSentenceWordSheet(entry,context.words,context.sentences,context.card,context.records,context.mode);
+    content.innerHTML=render({...context,entry});
     document.body.classList.add('word-sheet-open');
     dialog.showModal();
     content.querySelector(status?'[data-word-sheet-rating][aria-pressed=true]':'[data-word-sheet-close]')?.focus({preventScroll:true});
@@ -56,6 +60,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     } else if(button.dataset.wordSheetRating && context.entry.word) {
       const rating=button.dataset.wordSheetRating;
       if(onRating(context.entry.word.id,context.mode,rating)) {
+        if(selected.status){close();return;}
         refresh({focus:`[data-word-sheet-rating="${rating}"]`});
         content.querySelector('.word-sheet-feedback').textContent='保存しました';
       } else {
@@ -65,6 +70,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
   });
   dialog.addEventListener('close',()=>{
     const previous=selected;selected=null;
+    dialog.classList.remove('word-status-dialog');
     document.body.classList.remove('word-sheet-open');stopSpeech();
     const context=getContext();
     if(previous && context.card?.id===previous.cardId) {
