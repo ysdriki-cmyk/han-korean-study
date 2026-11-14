@@ -1,7 +1,7 @@
-import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=9';
-import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=7';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=9';
-import { createSentenceWordSheet } from './sentence-word-sheet.js?v=3';
+import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=10';
+import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=8';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=10';
+import { createSentenceWordSheet } from './sentence-word-sheet.js?v=4';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -16,14 +16,14 @@ import { applyReviewSchedule, nextReviewFor, mistakeCoolingDown } from './review
 import { icon } from './icons.js?v=3';
 import { createKoreanSpeaker } from './speech.js?v=2';
 import { speechButton } from './speech-view.js';
-import { readingAssessment, speakReadingQuestion } from './reading.js?v=2';
+import { readingAssessment, speakReadingQuestion } from './reading.js?v=3';
 import { buildStudySets, cardsForStudySet, setProgress, projectSentenceSets } from './study-sets.js?v=8';
 import { sentenceCollectionCards } from './sentence-collections.js?v=3';
 import { enrichConversationCards, buildConversationLessons } from './conversations.js?v=3';
 import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, unpracticedConversationLessons, randomConversationLesson } from './conversation-filters.js?v=2';
 import { renderConversationSpeaker, renderConversationPrompt, renderConversationNotes } from './conversation-view.js?v=2';
 import { buildVariationLessons, matchVariationAnswer } from './variations.js?v=2';
-import { parseVariationContent, combineSentenceSources } from './variation-content.js?v=1';
+import { parseVariationContent, combineSentenceSources } from './variation-content.js?v=2';
 import { renderVariationPrompt, renderVariationAnswer } from './variation-view.js?v=1';
 import { renderStudyHome } from './study-home.js?v=9';
 import { parseCategorySheet } from './category-sheet.js?v=2';

@@ -1,5 +1,5 @@
-import { normalizeSentences } from './sentences.js?v=7';
-import { namespaceCards } from './decks.js?v=9';
+import { normalizeSentences } from './sentences.js?v=8';
+import { namespaceCards } from './decks.js?v=10';
 import { isVariationSentence } from './sentence-collections.js?v=3';
 
 /** A dedicated sheet supplies membership; IDs and optional genre cells do not. */

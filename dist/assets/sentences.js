@@ -5,6 +5,12 @@ import { normalizeConversationMetadata } from './conversations.js?v=3';
 import { normalizeVariationMetadata } from './variations.js?v=2';
 
 const clean = value => String(value ?? '').normalize('NFC').trim();
+const contentHeaders = new Set([
+  'id_sentence','例文_韓国語','例文_日本語','ジャンル','カテゴリ','セットID','セット名','順番',
+  '変形タイプ','練習指示','変化ポイント','別解_韓国語','話し方','距離感・対象','使い方メモ','備考','訳2',
+  'シチュエーション','会話カテゴリ','カテゴリ番号','ターン','話者','会話の役割','学習優先度','単語由来タグ',
+].map(value => sheetHeader(value).normalize('NFKC')));
+const isContentHeader = header => contentHeaders.has(header) || /^(?:使用韓国語|使用単語ID|文中表記|文中訳)_(?:main|[1-9][0-9]*)$/u.test(header);
 const normalizeAnswer = value => clean(value).normalize('NFKC').toLowerCase().replace(/\s+/gu, '').replace(/[。.!！?？]+$/u, '');
 const dictionaries=new WeakMap();
 function dictionaryFor(words) {
@@ -52,9 +58,12 @@ export function normalizeSentences(text, {collection} = {}) {
   const numbered = headers.map((header,index) => ({match:/^使用韓国語_([1-9][0-9]*)$/u.exec(header),index})).filter(item=>item.match)
     .map(item=>({position:Number(item.match[1]),column:item.index})).sort((a,b)=>a.position-b.position);
   if (new Set(numbered.map(item=>item.position)).size !== numbered.length) throw new Error('使用韓国語の番号列が重複しています。');
+  const contentColumns = headers.map((header,index) => isContentHeader(header) ? index : -1).filter(index => index >= 0);
   const cards = [], warnings = [], ids = new Set(), variationOrders = new Map(); let excludedRows = 0;
   for (let index=1;index<rows.length;index++) {
     const row=rows[index]; if (row.every(value=>!clean(value))) continue;
+    // Sheet checkboxes may extend far past the lessons. Only textbook columns make a variation row nonempty.
+    if (dedicatedVariation && contentColumns.every(column => !clean(row[column]))) continue;
     const value = header => clean(row[headers.indexOf(sheetHeader(header).normalize('NFKC'))]);
     const id=value('id_sentence'), han=value('例文_韓国語'), kanji=value('例文_日本語');
     if (!id || !han || !kanji) {

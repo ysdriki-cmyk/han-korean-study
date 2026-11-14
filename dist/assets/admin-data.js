@@ -1,11 +1,11 @@
 import { parseCSV } from './core.js';
-import { parseDeck } from './decks.js?v=9';
+import { parseDeck } from './decks.js?v=10';
 import { sheetHeader } from './sheet-fields.js';
 import { essentialKanji } from './kanji.js';
 import { examplesFromVocabulary } from './topik.js';
-import { sentencesFromVocabulary } from './sentences.js?v=7';
+import { sentencesFromVocabulary } from './sentences.js?v=8';
 import { parseCategorySheet, CATEGORY_SHEET_HEADERS } from './category-sheet.js';
-import { parseVariationContent } from './variation-content.js?v=1';
+import { parseVariationContent } from './variation-content.js?v=2';
 
 const common = [
   { names: ['韓国語','han','ハングル','korean','ko_word','moments いろいろhello talk'], use: '主な韓国語。쓰기の正解・읽기の問題・読み上げに使用。' },

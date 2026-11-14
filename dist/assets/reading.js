@@ -1,6 +1,6 @@
-import { answerFields } from './decks.js';
+import { answerFields } from './decks.js?v=10';
 import { splitKanjiHints } from './kanji.js';
-import { matchSentenceAnswer } from './sentences.js';
+import { matchSentenceAnswer } from './sentences.js?v=8';
 
 const normalize = value => String(value ?? '').normalize('NFKC').trim().toLowerCase().replace(/\s+/gu, '').replace(/[〜～]/gu, '~').replace(/[。.!！?？]+$/u, '');
 

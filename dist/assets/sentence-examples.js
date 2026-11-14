@@ -1,4 +1,4 @@
-import { resolveSentenceWords } from './sentences.js?v=7';
+import { resolveSentenceWords } from './sentences.js?v=8';
 
 const clean=value=>String(value??'').normalize('NFC').trim();
 const sentenceKey=value=>clean(value).normalize('NFKC').replace(/\s+/gu,'').replace(/[。.!！?？]+$/u,'');

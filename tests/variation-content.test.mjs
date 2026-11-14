@@ -6,6 +6,8 @@ import { sentenceCollectionCards } from '../dist/assets/sentence-collections.js'
 import { buildVariationLessons, matchVariationAnswer } from '../dist/assets/variations.js';
 import { getRecord } from '../dist/assets/learning.js';
 import { recordAssessment, ratingFor } from '../dist/assets/assessment.js';
+import { validContentCSV } from '../functions/_lib/content-cache.js';
+import { resolveSentenceWords, linkSentenceWords } from '../dist/assets/sentences.js';
 
 const required = ['id_sentence','例文_韓国語','例文_日本語','セットID','順番'];
 const cell = value => `"${String(value ?? '').replace(/"/gu, '""')}"`;
@@ -49,6 +51,133 @@ test('ordinary tags and optional metadata survive dedicated parsing and headers 
   assert.equal(matchVariationAnswer('김밥을 안 먹었어요.', card), false);
   const tagged = parseVariationContent(csv([sample({ジャンル:'＃ＶＡＲＩＡＴＩＯＮ ＃食事'})], [...required,'ジャンル']));
   assert.equal(tagged.cards[0].tags, '＃ＶＡＲＩＡＴＩＯＮ ＃食事');
+});
+
+const managedSheetHeaders = ['id_sentence','remember','','☆方角way☆数字number☆日付date☆季節season★趣味運動hobby',
+  'ジャンル','練習指示','例文_日本語','例文_韓国語','別解_韓国語','変化ポイント','セットID','セット名','順番','変形タイプ',
+  '話し方','距離感・対象','使い方メモ','使用韓国語_main',...Array.from({length:10}, (_,index) => `使用韓国語_${index+1}`),''];
+const managedSheetRows = [
+  sample({id_sentence:'var_layout_003',remember:'FALSE',順番:'3',ジャンル:'#食事',セット名:'食べたことを話す',
+    練習指示:'知人に丁寧に伝える',例文_日本語:'キンパを食べました。',例文_韓国語:'김밥을 먹었어요.',変形タイプ:'相手に合わせる',話し方:'丁寧'}),
+  sample({id_sentence:'var_layout_001',remember:'TRUE',順番:'1',ジャンル:'#食事',セット名:'食べたことを話す',
+    練習指示:'友達に短く伝える',変形タイプ:'元の文',話し方:'タメ口'}),
+  sample({id_sentence:'var_layout_002',remember:'FALSE',順番:'2',ジャンル:'#食事',セット名:'食べたことを話す',
+    練習指示:'食べなかったことにする',例文_日本語:'キンパを食べなかった。',例文_韓国語:'김밥을 안 먹었어.',
+    別解_韓国語:'김밥을 먹지 않았어.',変化ポイント:'안 を足す',変形タイプ:'食べなかった事情',話し方:'タメ口'}),
+].map(row => ({...row,'☆方角way☆数字number☆日付date☆季節season★趣味運動hobby':'#数字number',
+  '距離感・対象':'知人',使い方メモ:'同じセットを順番に練習する',使用韓国語_main:'먹다'}));
+
+test('the managed sheet layout ignores management and empty columns while retaining both languages and numeric lesson order', () => {
+  const parsed = parseVariationContent(csv(managedSheetRows, managedSheetHeaders));
+  assert.deepEqual([parsed.warnings,parsed.excludedRows], [[],0]);
+  assert.deepEqual(parsed.cards.map(card => card.id), ['sentence:var_layout_003','sentence:var_layout_001','sentence:var_layout_002']);
+  const [lesson] = buildVariationLessons(parsed.cards);
+  assert.equal(lesson.baseCard.id, 'sentence:var_layout_001');
+  assert.deepEqual(lesson.cards.map(card => card.id), ['sentence:var_layout_001','sentence:var_layout_002','sentence:var_layout_003']);
+  assert.deepEqual(lesson.cards.map(card => [card.kanji,card.han]), [
+    ['キンパを食べた。','김밥을 먹었어.'],
+    ['キンパを食べなかった。','김밥을 안 먹었어.'],
+    ['キンパを食べました。','김밥을 먹었어요.'],
+  ]);
+  for (const card of parsed.cards) {
+    assert.equal(card.tags, '#食事 #variation');
+    assert.deepEqual(card.categories, ['食事','variation']);
+    assert.equal(card.mainKorean, '먹다');
+    assert.equal(ratingFor(card, {}, 'write'), 'unseen');
+  }
+  assert.equal(lesson.cards[1].variation.instruction, '食べなかったことにする');
+  assert.equal(lesson.cards[1].variation.point, '안 を足す');
+  assert.equal(matchVariationAnswer('김밥을 먹지 않았어.', lesson.cards[1]), true);
+});
+
+test('the production edge validator accepts managed-sheet exports and fixed IDs retain records through layout and row changes', () => {
+  const text = csv(managedSheetRows, managedSheetHeaders);
+  assert.equal(validContentCSV('variation', text), true);
+  const oldHeaders = managedSheetHeaders.filter(Boolean).filter(header => !['remember','☆方角way☆数字number☆日付date☆季節season★趣味運動hobby'].includes(header)).reverse();
+  const before = parseVariationContent(csv([...managedSheetRows].reverse(), oldHeaders)).cards;
+  const previous = before.find(card => card.sourceId === 'var_layout_002');
+  const records = {[previous.id]:recordAssessment(getRecord(previous), 'write', 'good', {correct:true,now:Date.parse('2026-11-15T00:00:00Z')})};
+  const moved = parseVariationContent(text).cards.find(card => card.id === previous.id);
+  assert.equal(moved.sourceId, 'var_layout_002');
+  assert.equal(moved.kanji, previous.kanji);
+  assert.equal(moved.han, previous.han);
+  assert.equal(ratingFor(moved, records, 'write'), 'good');
+  assert.equal(ratingFor(moved, records, 'read'), 'unseen');
+  assert.equal(records[moved.id].assessments.write.attempts, 1);
+  const duplicateId = managedSheetRows.map((row,index) => index === 0 ? {...row,id_sentence:'var_layout_001'} : row);
+  const duplicateOrder = managedSheetRows.map((row,index) => index === 0 ? {...row,順番:'1'} : row);
+  assert.equal(validContentCSV('variation', csv(duplicateId, managedSheetHeaders)), false);
+  assert.equal(validContentCSV('variation', csv(duplicateOrder, managedSheetHeaders)), false);
+});
+
+test('numbered vocabulary can grow from one word to ten without renumbering gaps or changing the independent main word', () => {
+  const lemmas = ['어제','저','친구','작다','카페','따뜻하다','커피','천천히','마시다','이야기하다'];
+  const meanings = ['昨日','私','友達','小さい','カフェ','温かい','コーヒー','ゆっくり','飲む','話す'];
+  const words = parseDeck('vocabulary', csv(lemmas.map((lemma,index) => ({id:`word_${index+1}`,韓国語:lemma,日本語:meanings[index]})), ['id','韓国語','日本語'])).cards;
+  const row = sample({id_sentence:'var_words_001',セットID:'words-family',remember:'FALSE',ジャンル:'#食事',使用韓国語_main:'마시다',
+    例文_韓国語:'어제 저는 친구랑 작은 카페에서 따뜻한 커피를 천천히 마시면서 이야기했어요.',
+    例文_日本語:'昨日、私は友達と小さなカフェで温かいコーヒーをゆっくり飲みながら話しました。'});
+  const stages = [[1],[1,3,9,10],Array.from({length:10}, (_,index) => index+1)];
+  const cards = stages.map(positions => {
+    const numbered = Object.fromEntries(positions.map(position => [`使用韓国語_${position}`,lemmas[position-1]]));
+    const text = csv([{...row,...numbered}], managedSheetHeaders);
+    assert.equal(validContentCSV('variation', text), true);
+    const [card] = parseVariationContent(text).cards;
+    assert.deepEqual(card.sentenceRefs.map(ref => ref.position), positions);
+    assert.deepEqual(card.sentenceRefs.map(ref => ref.korean), positions.map(position => lemmas[position-1]));
+    const resolved = resolveSentenceWords(card, words);
+    assert.deepEqual(resolved.warnings, []);
+    assert.deepEqual(resolved.rows.map(ref => ref.position), positions);
+    assert.deepEqual(resolved.rows.map(ref => ref.japanese), positions.map(position => meanings[position-1]));
+    assert.equal(resolved.main.words[0].id, 'vocabulary:word_9');
+    assert.deepEqual(resolved.rows.filter(ref => ref.main).map(ref => ref.position), positions.includes(9) ? [9] : []);
+    const linked = linkSentenceWords([card], words);
+    assert.deepEqual(linked.warnings, []);
+    assert.equal(linked.cards[0].mainWord.id, 'vocabulary:word_9');
+    assert.equal(linked.cards[0].sourceWord.id, 'vocabulary:word_9');
+    assert.deepEqual(new Set(linked.cards[0].sourceWords.map(word => word.id)), new Set([...positions,9].map(position => `vocabulary:word_${position}`)));
+    return card;
+  });
+  assert.deepEqual(cards.map(card => card.id), ['sentence:var_words_001','sentence:var_words_001','sentence:var_words_001']);
+  assert.deepEqual(cards.map(card => card.mainKorean), ['마시다','마시다','마시다']);
+  assert.equal(cards[1].sentenceRefs.at(-1).position, 10);
+  assert.equal(cards[2].sentenceRefs.length, 10);
+});
+
+test('management-only rows between lessons and after the final sentence do not invalidate a managed-sheet export', () => {
+  const controls = {remember:'FALSE','☆方角way☆数字number☆日付date☆季節season★趣味運動hobby':'TRUE'};
+  const rows = [controls,managedSheetRows[0],{...controls,remember:'TRUE'},...managedSheetRows.slice(1),
+    ...Array.from({length:30}, (_,index) => ({...controls,remember:index % 2 ? 'TRUE' : 'FALSE'}))];
+  const text = csv(rows, managedSheetHeaders);
+  const parsed = parseVariationContent(text);
+  assert.deepEqual(parsed.cards.map(card => card.sourceId), ['var_layout_003','var_layout_001','var_layout_002']);
+  assert.deepEqual([parsed.warnings,parsed.excludedRows], [[],0]);
+  assert.deepEqual(buildVariationLessons(parsed.cards)[0].cards.map(card => card.variation.order), [1,2,3]);
+  assert.equal(validContentCSV('variation', text), true);
+  const onlyManagement = csv([controls,{...controls,remember:'TRUE'}], managedSheetHeaders);
+  assert.throws(() => parseVariationContent(onlyManagement), /学習できる文章がありません/u);
+  assert.equal(validContentCSV('variation', onlyManagement), false);
+});
+
+test('management columns cannot hide partially entered sentence rows from validation', () => {
+  for (const partial of [
+    {id_sentence:'unfinished'},
+    {例文_日本語:'あとで韓国語を書く文章'},
+    {例文_韓国語:'나중에 완성할 문장'},
+    {ジャンル:'#食事'},
+    {練習指示:'あとで例文を追加する'},
+    {セットID:'unfinished-family'},
+    {順番:'1'},
+    {別解_韓国語:'김밥을 먹지 않았어.'},
+    {使用韓国語_main:'먹다'},
+    {使用韓国語_1:'김밥'},
+    {使用韓国語_10:'먹다'},
+  ]) {
+    const row = {...partial,remember:'FALSE','☆方角way☆数字number☆日付date☆季節season★趣味運動hobby':'TRUE'};
+    const text = csv([managedSheetRows[0],row], managedSheetHeaders);
+    assert.throws(() => parseVariationContent(text), /ID・韓国語例文・日本語例文が必要/u, JSON.stringify(partial));
+    assert.equal(validContentCSV('variation', text), false, JSON.stringify(partial));
+  }
 });
 
 test('header-only, transient, incomplete and structurally invalid dedicated snapshots are rejected', () => {
