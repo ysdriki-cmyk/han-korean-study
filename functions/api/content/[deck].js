@@ -5,6 +5,7 @@ const sources = Object.freeze({
   kanji: { gid: '29317581', variable: 'KANJI_SHEET_CSV_URL' },
   vocabulary: { gid: '0', variable: 'VOCABULARY_SHEET_CSV_URL' },
   sentence: { gid: '64554523', variable: 'SENTENCE_SHEET_CSV_URL' },
+  variation: { gid: '1475350480', variable: 'VARIATION_SHEET_CSV_URL' },
 });
 
 export function onRequest(context) {

@@ -1,0 +1,28 @@
+.variation-prompt { margin: 8px 0 22px; text-align: left; }
+.variation-step { display: flex; align-items: center; gap: 10px; color: #62788e; font-size: 12px; }
+.variation-step > span { font-variant-numeric: tabular-nums; }
+.variation-step > strong { border-radius: 5px; background: #edf5ff; padding: 4px 8px; color: #2866a5; font-weight: 600; }
+.variation-instruction { margin: 12px 0 0; color: #354b61; font-size: 15px; line-height: 1.8; }
+.variation-context { margin: 5px 0 0; color: #718095; font-size: 12px; }
+.variation-base { margin-top: 15px; border: 1px solid #e0e7ef; border-radius: 9px; padding: 10px 14px; background: #fafcfe; }
+.variation-base > summary { width: fit-content; color: #6d7e91; font-size: 12px; cursor: pointer; }
+.variation-base > p { display: flex; align-items: center; gap: 6px; margin: 10px 0 4px; color: #52687f; font-size: 19px; line-height: 1.7; overflow-wrap: anywhere; }
+.variation-base > span { color: #8390a0; font-size: 12px; line-height: 1.7; }
+.variation-base > summary:focus-visible { outline: 3px solid #a8cbfa; outline-offset: 4px; }
+.variation-answer { margin: 0 0 24px; padding: 16px 18px; border: 1px solid #dce8f5; border-radius: 10px; background: #fafcff; text-align: left; }
+.variation-comparison { display: grid; gap: 12px; }
+.variation-comparison > div > span,.variation-alternatives > span { color: #76889b; font-size: 11px; }
+.variation-comparison p { margin: 5px 0 0; color: #3b526b; font-size: 19px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+.variation-comparison mark { border-radius: 3px; padding: 2px 0; color: inherit; }
+.variation-comparison .variation-before { background: #fff0dc; }
+.variation-comparison .variation-after { background: #ddecff; color: #1c5997; }
+.variation-note { margin: 13px 0 0; color: #61788e; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.variation-note:first-child { margin-top: 0; }
+.variation-alternatives { margin-top: 14px; border-top: 1px solid #e3ebf4; padding-top: 12px; }
+.variation-alternatives > p { display: flex; align-items: center; gap: 6px; margin: 7px 0 0; color: #3b526b; font-size: 17px; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .variation-prompt { margin-bottom: 18px; }
+  .variation-instruction { font-size: 14px; }
+  .variation-answer { padding: 13px 14px; }
+  .variation-comparison p,.variation-base > p { font-size: 18px; }
+}

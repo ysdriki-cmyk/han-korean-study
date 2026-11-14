@@ -1,4 +1,4 @@
-import { sentenceWordEntries, renderSentenceWordSheet } from './sentence-view.js?v=7';
+import { sentenceWordEntries, renderSentenceWordSheet } from './sentence-view.js?v=9';
 
 /** Native modal focus trapping, scoped rating edits and example paging. */
 export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopSpeech}) {

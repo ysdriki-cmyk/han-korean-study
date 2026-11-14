@@ -1,14 +1,14 @@
-import { DECKS, parseDeck } from './decks.js?v=7';
-import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=7';
+import { DECKS, parseDeck } from './decks.js?v=9';
+import { inspectContent, inspectCategoryContent, summarizeLearning } from './admin-data.js?v=9';
 import { readContentSnapshot } from './content-cache.js?v=2';
-import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=3';
+import { readContentDiagnostics, DIAGNOSTICS_KEY } from './content-diagnostics.js?v=4';
 import { nextReviewFor } from './review.js?v=4';
-import { sentenceWordIssues } from './sentences.js?v=5';
+import { sentenceWordIssues } from './sentences.js?v=7';
 
 const $ = selector => document.querySelector(selector);
 const $$ = selector => [...document.querySelectorAll(selector)];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-const names = { kanji: '한漢', vocabulary: '単語', sentence: 'sentence', category_enshu: '演習セット（category_enshu）' };
+const names = { kanji: '한漢', vocabulary: '単語', sentence: 'sentence', variation: 'variation', category_enshu: '演習セット（category_enshu）' };
 const sourceNames = { remote: 'スプシ', cached: '保存済み教材', bundled: '同梱教材', unavailable: '教材なし' };
 const routes = {
   overview: { path: '/admin/', title: '運用チェック', label: '概要' },
@@ -19,7 +19,7 @@ const routes = {
   guide: { path: '/admin/guide/', title: '更新ガイド', label: 'ガイド' },
 };
 const config = window.APP_CONFIG || {};
-const contentIds = [...DECKS.filter(deck => !deck.sourceDeckId).map(deck => deck.id), ...(config.categorySetsCsvUrl ? ['category_enshu'] : [])];
+const contentIds = [...DECKS.filter(deck => !deck.sourceDeckId).map(deck => deck.id), 'variation', ...(config.categorySetsCsvUrl ? ['category_enshu'] : [])];
 const results = new Map();
 let checking = false, sentenceIssues = [], reportSentenceText = null, reportWordText = null;
 const storage = { getItem: key => localStorage.getItem(key) };
@@ -28,7 +28,7 @@ const number = value => Number(value || 0).toLocaleString('ja-JP');
 const badge = (label, kind = '') => `<span class="status ${kind}">${esc(label)}</span>`;
 const fact = (label, content) => `<div><dt>${esc(label)}</dt><dd>${content}</dd></div>`;
 const dateFact = (label, time) => fact(label, esc(formatTime(time)));
-const endpoint = id => id === 'category_enshu' ? config.categorySetsCsvUrl || '' : config.decks?.[id]?.csvUrl || '';
+const endpoint = id => id === 'category_enshu' ? config.categorySetsCsvUrl || '' : id === 'variation' ? config.variation?.csvUrl || '' : config.decks?.[id]?.csvUrl || '';
 const inspectSource = (id, text) => id === 'category_enshu' ? inspectCategoryContent(text) : inspectContent(id, text);
 const contentUnit = id => id === 'category_enshu' ? 'セット' : '枚';
 const sourceName = (id, source) => id === 'category_enshu'
@@ -88,7 +88,7 @@ function renderContent() {
       if (id === 'kanji' || id === 'vocabulary') facts += fact(id === 'kanji' ? '必須文字' : 'TOPIK1参考例', `${number(id === 'kanji' ? data.essential : data.references)} 件`);
       facts += fact('CSVのデータ行', `${number(data.rawRows)} 行`);
       if (id === 'vocabulary') facts += fact('保持している分類', `${number(data.categories)} 種類`);
-      if (id === 'sentence') facts += fact('文章ジャンル', `${number(data.categories)} 種類`);
+      if (id === 'sentence' || id === 'variation') facts += fact('文章ジャンル', `${number(data.categories)} 種類`);
       if (id === 'vocabulary') facts += fact('旧形式から移行できる例文', `${number(data.sentences)} 件（例文の両言語あり）`);
     }
     facts += fact('通常画面の前回読込', previous ? badge(sourceName(id, previous.source), previous.source === 'remote' ? 'ok' : 'warn') + `<span class="small">${number(previous.cardCount)}${contentUnit(id)} · ${esc(formatTime(previous.checkedAt))}</span>` : '未記録（通常画面を一度開くと記録）');
@@ -116,6 +116,7 @@ function renderStorage() {
     ['han-hanja:content:v1:kanji', '漢字教材の正常取得版'],
     ['han-hanja:content:v1:vocabulary', '単語教材の正常取得版'],
     ['han-hanja:content:v1:sentence', '文章教材の正常取得版'],
+    ['han-hanja:content:v1:variation', 'variation専用教材の正常取得版'],
     ['han-hanja:content:v1:category_enshu', '演習セット定義の正常取得版'],
     [DIAGNOSTICS_KEY, '通常画面の教材取得状態'],
   ];
@@ -158,7 +159,7 @@ function render() { renderOverview(); renderContent(); renderSchema(); renderSto
 async function inspectEndpoint(id) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.fetchTimeoutMs || 20000);
-  let httpStatus = null;
+  let httpStatus = null, parsingCSV = false;
   try {
     if (!endpoint(id)) throw new Error('教材APIが未設定です。');
     const url = new URL(endpoint(id), location.origin);
@@ -169,11 +170,12 @@ async function inspectEndpoint(id) {
     if (/text\/html/i.test(response.headers.get('content-type') || '')) throw new Error('APIがCSVではなくHTMLを返しています。');
     const text = await response.text();
     if (text.length > 3 * 1024 * 1024) throw new Error('CSVがサイズ上限を超えています。');
+    parsingCSV = true;
     const data = inspectSource(id, text);
-    const invalid = (id === 'category_enshu' && !data.valid) || (id === 'sentence' && !data.count);
-    return { ok: !invalid, httpStatus, dataSource: response.headers.get('x-data-source') || '', edgeCache:response.headers.get('x-content-cache') || '',cachedAt:response.headers.get('x-content-cached-at') || null,data, text, ...(invalid ? { failureKind: 'input', error: data.error || 'sentenceシートに有効な文章がありません。' } : {}), checkedAt: new Date().toISOString() };
+    const invalid = (id === 'category_enshu' && !data.valid) || (['sentence','variation'].includes(id) && !data.count);
+    return { ok: !invalid, httpStatus, dataSource: response.headers.get('x-data-source') || '', edgeCache:response.headers.get('x-content-cache') || '',cachedAt:response.headers.get('x-content-cached-at') || null,data, text, ...(invalid ? { failureKind: 'input', error: data.error || `${id}シートに有効な文章がありません。` } : {}), checkedAt: new Date().toISOString() };
   } catch (error) {
-    return { ok: false, httpStatus, error: controller.signal.aborted ? '取得がタイムアウトしました。' : error instanceof Error ? error.message : '接続を確認できませんでした。', checkedAt: new Date().toISOString() };
+    return { ok: false, httpStatus, ...(parsingCSV ? { failureKind: 'input' } : {}), error: controller.signal.aborted ? '取得がタイムアウトしました。' : error instanceof Error ? error.message : '接続を確認できませんでした。', checkedAt: new Date().toISOString() };
   } finally { clearTimeout(timer); }
 }
 async function recheck() {

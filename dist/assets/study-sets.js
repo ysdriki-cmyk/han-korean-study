@@ -2,8 +2,9 @@ import { essentialKanji } from './kanji.js';
 import { categoryLabels } from './sheet-fields.js';
 import { ratingFor } from './assessment.js';
 import { practiceCount } from './practice.js';
-import { sentenceCollectionCards } from './sentence-collections.js?v=2';
-import { buildConversationLessons, conversationLessonCards } from './conversations.js?v=2';
+import { sentenceCollectionCards } from './sentence-collections.js?v=3';
+import { buildConversationLessons, conversationLessonCards } from './conversations.js?v=3';
+import { buildVariationLessons, variationLessonCards } from './variations.js?v=2';
 
 const DECKS = new Set(['kanji', 'vocabulary', 'sentence']);
 const TEXT_FIELDS = new Set(['han', 'kanji', 'hanja', 'meaning', 'english', 'tags', 'topikCategory', 'mainKorean']);
@@ -65,7 +66,7 @@ function normalizeCustomSet(value, deckId) {
   }
   const base = { id: value.id, label, group: value.source === 'sheet' ? 'セット' : 'カスタム', kind: value.kind, deckId, ...metadata };
   if (value.collection != null) {
-    if (deckId !== 'sentence' || !['core','extra','conversation'].includes(value.collection)) return null;
+    if (deckId !== 'sentence' || !['core','extra','conversation','variation'].includes(value.collection)) return null;
     base.collection=value.collection;
   }
   if (value.kind === 'all' && value.source === 'sheet') {
@@ -102,6 +103,12 @@ export function buildStudySets(deckId, cards, customSets = [], {collection='core
     return buildConversationLessons(source).map(lesson => ({
       id: lesson.id, sourceId: lesson.sourceId, label: lesson.label, group: lesson.category || '会話',
       kind: 'conversation', deckId, collection,
+    }));
+  }
+  if (deckId === 'sentence' && collection === 'variation') {
+    return buildVariationLessons(source).map(lesson => ({
+      id: lesson.id, sourceId: lesson.sourceId, label: lesson.label, group: lesson.category || '一文を育てる',
+      kind: 'variation', deckId, collection,
     }));
   }
   const sets = [{ id: 'all', label: 'すべて', group: '基本', kind: 'all', deckId }];
@@ -153,6 +160,9 @@ export function cardsForStudySet(cards, set) {
   const source = set.deckId==='sentence' ? sentenceCollectionCards(deckCards(cards,set.deckId),set.collection || 'core') : deckCards(cards, set.deckId);
   if (set.kind === 'conversation' && set.deckId === 'sentence' && set.collection === 'conversation') {
     return conversationLessonCards(source, set.id);
+  }
+  if (set.kind === 'variation' && set.deckId === 'sentence' && set.collection === 'variation') {
+    return variationLessonCards(source, set.id);
   }
   if (set.kind === 'sentence' && set.deckId === 'sentence' && set.sourceSet?.deckId === 'vocabulary') {
     const words = source.flatMap(card => card.sourceWords || (card.sourceWord ? [card.sourceWord] : []));

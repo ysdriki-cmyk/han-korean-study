@@ -6,6 +6,7 @@ window.APP_CONFIG = {
     sentence: {csvUrl: '/api/content/sentence', fallbackCsvUrl: './data/startup/sentence.csv'}
   },
   referencesFromVocabulary: true,
+  variation: {csvUrl: '/api/content/variation', fallbackCsvUrl: './data/variation.csv'},
   categorySetsCsvUrl: '/api/category-sets',
   categorySetsFallbackCsvUrl: './data/startup/category_enshu.csv',
   refreshIntervalMs: 60000,

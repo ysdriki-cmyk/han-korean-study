@@ -79,18 +79,19 @@ function setRow(set, canCreate) {
   const label = String(set.label ?? '');
   const custom = set.group === 'カスタム' || set.kind === 'custom';
   const conversation = set.kind === 'conversation';
-  const unit = conversation ? '発話' : '枚';
+  const variation = set.kind === 'variation';
+  const unit = conversation ? '発話' : variation ? '文' : '枚';
   return `<li class="home-set-row">
     <div class="home-set-main">
       <div class="home-set-title"><h3>${esc(label)}</h3><span class="home-set-group">${esc(set.group)}</span><span class="home-set-count">${number(progress.total)}${unit}</span></div>
       <div class="home-set-progress">${distribution(progress, label, false, unit)}<span class="home-set-percent" aria-label="○・◎の割合 ${progress.masteredPercent}%"><span>○・◎</span> <strong>${progress.masteredPercent}<small>%</small></strong></span></div>
     </div>
-    <div class="home-set-actions"><button type="button" class="home-button home-button-primary" data-start-set="${esc(set.id)}" aria-label="${esc(label)}${conversation ? 'のレッスンを開始' : 'で演習'}"${progress.total ? '' : ' disabled'}>${conversation ? '開始' : '演習'}<span aria-hidden="true">→</span></button><button type="button" class="home-button home-button-secondary" data-list-set="${esc(set.id)}" aria-label="${esc(label)}のカード一覧">一覧</button>${canCreate && custom ? `<button type="button" class="home-delete" data-delete-set="${esc(set.id)}" aria-label="${esc(label)}を削除" title="セットを削除"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6M14 10v6"/></svg></button>` : ''}</div>
+    <div class="home-set-actions"><button type="button" class="home-button home-button-primary" data-start-set="${esc(set.id)}" aria-label="${esc(label)}${conversation ? 'のレッスンを開始' : variation ? 'で変形を練習' : 'で演習'}"${progress.total ? '' : ' disabled'}>${conversation ? '開始' : variation ? '練習' : '演習'}<span aria-hidden="true">→</span></button><button type="button" class="home-button home-button-secondary" data-list-set="${esc(set.id)}" aria-label="${esc(label)}のカード一覧">一覧</button>${canCreate && custom ? `<button type="button" class="home-delete" data-delete-set="${esc(set.id)}" aria-label="${esc(label)}を削除" title="セットを削除"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v6M14 10v6"/></svg></button>` : ''}</div>
   </li>`;
 }
 
 /** Render the home screen. The caller owns state, event handling, and the set builder dialog. */
-export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = null, sets = [], query = '', group = 'all', canResume = false, canCreate = false, sentenceCollection='core', extraProgress={}, conversationProgress={}, conversationFilters={}, conversationFilterOptions={}, conversationDetailsOpen=false } = {}) {
+export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = null, sets = [], query = '', group = 'all', canResume = false, canCreate = false, sentenceCollection='core', extraProgress={}, conversationProgress={}, variationProgress={}, conversationFilters={}, conversationFilterOptions={}, conversationDetailsOpen=false } = {}) {
   const selectedCourse = courses.find(course => course.id === activeDeck);
   const available = selectedCourse?.available !== false;
   const normalizedQuery = searchValue(query).trim();
@@ -105,21 +106,24 @@ export function renderStudyHome({ courses = [], activeDeck = 'kanji', mode = nul
   const selectedMode = mode === 'read' || mode === 'write' ? mode : activeDeck === 'kanji' ? 'write' : 'read';
   const extra=activeDeck==='sentence' && sentenceCollection==='extra';
   const conversation=activeDeck==='sentence' && sentenceCollection==='conversation';
+  const variation=activeDeck==='sentence' && sentenceCollection==='variation';
   const additional=progressFor(extraProgress);
   const dialogue=progressFor(conversationProgress);
-  const collectionEntry=activeDeck!=='sentence' ? '' : extra || conversation
-    ? `<div class="home-collection-nav"><button type="button" data-sentence-collection="core">← いつものsentenceへ</button><strong>${conversation?'conversation':'extra'}<span>${conversation?'会話レッスン':'追加の例文'}</span></strong></div>`
-    : `<div class="home-collections"><button type="button" class="home-extra-card" data-sentence-collection="extra"${!additional.total?' disabled':''} aria-label="extra 追加の例文、${number(additional.total)}枚"><span class="home-extra-title"><strong>extra</strong><span>追加の例文</span></span><span class="home-extra-count">${number(additional.total)}枚 <span aria-hidden="true">→</span></span>${distribution(additional,'extra',true)}</button><button type="button" class="home-extra-card home-conversation-card" data-sentence-collection="conversation"${!dialogue.total?' disabled':''} aria-label="conversation 会話レッスン、${number(conversationProgress.lessonCount)}レッスン、${number(dialogue.total)}発話"><span class="home-extra-title"><strong>conversation</strong><span>会話レッスン</span></span><span class="home-extra-count">${number(conversationProgress.lessonCount)}レッスン <span aria-hidden="true">→</span></span>${distribution(dialogue,'conversation',true,'発話')}</button></div>`;
-  const collectionTitle=conversation?'conversation':extra?'extra':selectedCourse?.label ?? (activeDeck === 'vocabulary' ? '単語' : '한漢');
+  const variations=progressFor(variationProgress);
+  const collectionEntry=activeDeck!=='sentence' ? '' : extra || conversation || variation
+    ? `<div class="home-collection-nav"><button type="button" data-sentence-collection="core">← いつものsentenceへ</button><strong>${conversation?'conversation':variation?'variation':'extra'}<span>${conversation?'会話レッスン':variation?'一つの文を変形する':'追加の例文'}</span></strong></div>`
+    : `<div class="home-collections"><button type="button" class="home-extra-card" data-sentence-collection="extra"${!additional.total?' disabled':''} aria-label="extra 追加の例文、${number(additional.total)}枚"><span class="home-extra-title"><strong>extra</strong><span>追加の例文</span></span><span class="home-extra-count">${number(additional.total)}枚 <span aria-hidden="true">→</span></span>${distribution(additional,'extra',true)}</button><button type="button" class="home-extra-card home-conversation-card" data-sentence-collection="conversation"${!dialogue.total?' disabled':''} aria-label="conversation 会話レッスン、${number(conversationProgress.lessonCount)}レッスン、${number(dialogue.total)}発話"><span class="home-extra-title"><strong>conversation</strong><span>会話レッスン</span></span><span class="home-extra-count">${number(conversationProgress.lessonCount)}レッスン <span aria-hidden="true">→</span></span>${distribution(dialogue,'conversation',true,'発話')}</button><button type="button" class="home-extra-card home-variation-card" data-sentence-collection="variation"${!variations.total?' disabled':''} aria-label="variation 一つの文を変形する、${number(variationProgress.lessonCount)}セット、${number(variations.total)}文"><span class="home-extra-title"><strong>variation</strong><span>一つの文を変形する</span></span><span class="home-extra-count">${number(variationProgress.lessonCount)}セット <span aria-hidden="true">→</span></span>${distribution(variations,'variation',true,'文')}</button></div>`;
+  const collectionTitle=conversation?'conversation':variation?'variation':extra?'extra':selectedCourse?.label ?? (activeDeck === 'vocabulary' ? '単語' : '한漢');
   const itemLabel=conversation?'レッスン':'セット';
-  const canStart=available && (!extra || additional.total) && (!conversation || filteredSets.some(set => progressFor(set).total && set.unpracticed !== false));
+  const canStart=available && (!extra || additional.total) && (!conversation || filteredSets.some(set => progressFor(set).total && set.unpracticed !== false)) && (!variation || filteredSets.some(set => progressFor(set).total));
   const noUnpracticed=conversation && available && filteredSets.some(set => progressFor(set).total) && !canStart;
   const searchLabel=conversation?'場面・使い方メモを検索':`${itemLabel}を検索`;
   return `<div class="study-home">
     <h1 class="sr-only">ホーム</h1>
     <div class="home-courses" role="group" aria-label="教材を選ぶ">${courses.map(course => courseCard(course, activeDeck)).join('')}</div>
-    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" ${conversation ? 'title="未演習のシーンをランダムに選んで開始" ' : ''}data-start-practice${canStart ? '' : ' disabled'}>${conversation?(noUnpracticed?'未演習のシーンはありません':'レッスンを開始する'):extra?'extraの演習を開始する':'演習を開始する'}<span aria-hidden="true">→</span></button>${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
+    <div class="home-start-actions"><button type="button" class="home-button home-button-primary home-start" ${conversation ? 'title="未演習のシーンをランダムに選んで開始" ' : ''}data-start-practice${canStart ? '' : ' disabled'}>${conversation?(noUnpracticed?'未演習のシーンはありません':'レッスンを開始する'):variation?'練習を開始する':extra?'extraの演習を開始する':'演習を開始する'}<span aria-hidden="true">→</span></button>${canResume ? '<button type="button" class="home-resume" data-resume-study>演習を続ける<span aria-hidden="true">→</span></button>' : ''}</div>
     ${collectionEntry}
+    ${variation ? '<p class="home-variation-note">一つの文を、少しずつ変えて練習します。</p>' : ''}
     <section class="home-sets" aria-labelledby="home-sets-title">
       <div class="home-sets-heading"><h2 id="home-sets-title">${esc(collectionTitle)}<span>の${itemLabel}</span></h2><div class="home-mode-switch" role="group" aria-label="演習モード">${modes.map(item => `<button type="button" data-home-mode="${item.id}" aria-pressed="${selectedMode === item.id}" title="${esc(item.direction)}"><strong lang="ko">${item.label}</strong><span>${esc(item.direction)}</span></button>`).join('')}</div></div>
       <div class="home-set-tools"><label class="home-search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><input id="set-search" type="search" value="${esc(query)}" aria-label="${searchLabel}" placeholder="${searchLabel}" autocomplete="off"></label>${canCreate ? '<button type="button" class="home-button home-create" data-create-set aria-haspopup="dialog"><span aria-hidden="true">＋</span>セットを作成</button>' : ''}</div>

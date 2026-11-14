@@ -200,6 +200,8 @@ body[data-view=home] .workspace-controls { display: none; }
 .study-home .home-collections .home-extra-title > span { color: #748199; font-size: 11px; }
 .study-home .home-extra-count { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .study-home .home-conversation-card .home-extra-title strong { font-size: 19px; }
+.study-home .home-variation-card { grid-column: 1 / -1; }
+.study-home .home-variation-note { margin: -8px 0 22px; color: #748199; font-size: 12px; line-height: 1.7; }
 .study-home .home-random-lesson { gap: 12px; padding: 12px 18px; border: 1px solid #cddcf0; color: #3368aa; background: #fff; font-size: 13px; }
 .study-home .home-conversation-filters { margin: 0 24px 18px; border: 1px solid #dfe7f2; border-radius: 11px; background: #fbfcff; }
 .study-home .home-conversation-filters > summary { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 11px 15px; color: #64748b; font-size: 12px; font-weight: 600; cursor: pointer; list-style: none; }

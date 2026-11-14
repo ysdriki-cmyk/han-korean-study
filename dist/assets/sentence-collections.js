@@ -7,16 +7,18 @@ export function sentenceCollection(card) {
   const turn = Number(String(card.conversation?.turn ?? '').normalize('NFKC').trim());
   const explicitDialogue = Number.isSafeInteger(turn) && turn > 0 && String(card.conversation?.speaker ?? '').trim();
   if (tags.includes('conversation') || explicitDialogue) return 'conversation';
+  if (tags.includes('variation')) return 'variation';
   if (tags.includes('subtitle')) return 'extra';
   return 'core';
 }
 
 export function isConversationSentence(card) { return sentenceCollection(card) === 'conversation'; }
+export function isVariationSentence(card) { return sentenceCollection(card) === 'variation'; }
 
 /** Subtitle examples are opt-in; their records retain ordinary sentence IDs. */
 export function isExtraSentence(card) { return sentenceCollection(card) === 'extra'; }
 
 export function sentenceCollectionCards(cards, collection = 'core') {
-  if (!['core', 'extra', 'conversation'].includes(collection)) return [];
+  if (!['core', 'extra', 'conversation', 'variation'].includes(collection)) return [];
   return cards.filter(card => sentenceCollection(card) === collection);
 }

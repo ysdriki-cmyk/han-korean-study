@@ -1,10 +1,11 @@
 import { parseCSV } from './core.js';
-import { parseDeck } from './decks.js?v=7';
+import { parseDeck } from './decks.js?v=9';
 import { sheetHeader } from './sheet-fields.js';
 import { essentialKanji } from './kanji.js';
 import { examplesFromVocabulary } from './topik.js';
-import { sentencesFromVocabulary } from './sentences.js?v=5';
+import { sentencesFromVocabulary } from './sentences.js?v=7';
 import { parseCategorySheet, CATEGORY_SHEET_HEADERS } from './category-sheet.js';
+import { parseVariationContent } from './variation-content.js?v=1';
 
 const common = [
   { names: ['韓国語','han','ハングル','korean','ko_word','moments いろいろhello talk'], use: '主な韓国語。쓰기の正解・읽기の問題・読み上げに使用。' },
@@ -54,6 +55,27 @@ const fields = {
     {names:['使い方メモ'],use:'任意の会話の使い方・状況メモ。会話ホームの検索対象。'},
     {names:['備考'],use:'編集メモとして保持。通常の演習画面では非表示。'},
   ],
+  variation: [
+    {names:['id_sentence'],use:'文章の固定ID。variationと既存sentenceを通じて一意にし、変更・再利用しない。学習記録はsentence:<id_sentence>に保存。'},
+    {names:['例文_韓国語'],use:'읽기の問題・쓰기の模範解答。完成した文全体と読み上げに使用。'},
+    {names:['例文_日本語'],use:'쓰기の出題内容・읽기の模範解答。完成した文全体の日本語訳。'},
+    {names:['訳2','訳２'],use:'任意の補足訳。解答後だけ表示し、出題・自動採点には使用しない。'},
+    {names:['セットid'],use:'必須。同じ元の文を使う変形練習セットの固定ID。セット内の各文でそろえる。'},
+    {names:['セット名'],use:'練習セットの表示名。例：キンパを食べた。同じセット内でそろえる。'},
+    {names:['順番'],use:'必須。セット内の正の整数。同じセット内で重複させない。最小の順番の行が元の文になる。'},
+    {names:['変形タイプ'],use:'基本文・時間を足す・否定・丁寧・組み合わせ等の練習の種類。'},
+    {names:['練習指示'],use:'쓰기の解答前に表示するお題。읽기では答えのヒントになるため解答前に表示しない。'},
+    {names:['変化ポイント'],use:'解答後に表示する短い説明。元の文から変わった部分の確認に使用。'},
+    {names:['別解_韓国語'],use:'쓰기で正解にする完成文をセル内改行で指定。語尾や単語だけではなく全文を入れる。'},
+    {names:['ジャンル'],use:'任意の分類。専用variationシートなので#variationは省略できる。会話・字幕の指定は併記しない。'},
+    {names:['カテゴリ'],use:'任意の練習セットの分類。セット内で同じ値を指定する。'},
+    {names:['使用韓国語_main'],use:'メイン単語の辞書形。han_wordsの単語を参照し、語義を表示する。'},
+    {names:['使用単語id_main'],use:'任意。メイン単語の固定ID。同表記の別語義を指定する。'},
+    {names:['話し方'],use:'タメ口・丁寧など。練習指示と模範解答に合う話し方を指定する。'},
+    {names:['距離感・対象'],use:'親しい友達・丁寧に話す相手など。言い方を選ぶ場面の補足。'},
+    {names:['使い方メモ'],use:'解答後に表示する任意の使い分け・場面の補足。'},
+    {names:['備考'],use:'編集メモとして保持。通常の演習画面では非表示。'},
+  ],
 };
 const categoryUses = [
   'セットの固定ID。同じIDの行を1セットの条件としてまとめる。半角英数字・_・-で1〜100文字。',
@@ -75,12 +97,12 @@ export function columnLetter(index) {
 
 /** Use the production parser, but never fall back or save content on an admin check. */
 export function inspectContent(deckId, text) {
-  const result = parseDeck(deckId, text);
+  const result = deckId === 'variation' ? parseVariationContent(text) : parseDeck(deckId, text);
   const rows = parseCSV(text);
   const columns = rows[0].map((header, index) => {
     const name = sheetHeader(header);
     let definition = fields[deckId]?.find(field => field.names.includes(name));
-    if (deckId==='sentence') {
+    if (deckId==='sentence' || deckId==='variation') {
       if (/^使用韓国語_[0-9０-９]+$/u.test(name)) definition={use:'文中順の辞書形。番号が小さい順に表示し、han_wordsから原形・日本語を参照する。番号列は追加可能。'};
       if (/^文中表記_[0-9０-９]+$/u.test(name)) definition={use:'任意。얼굴에・써など文中の形を表示。照合には同番号の使用韓国語を使う。'};
       if (/^文中訳_[0-9０-９]+$/u.test(name)) definition={use:'任意。助詞・活用に合わせた文中の訳。空欄ならhan_wordsの日本語。'};
@@ -101,7 +123,7 @@ export function inspectContent(deckId, text) {
     references: deckId === 'vocabulary' ? examplesFromVocabulary(result.cards).length : null,
     sentences: deckId === 'vocabulary' ? sentencesFromVocabulary(result.cards).length : null,
     warnings: result.warnings,
-    categories: ['vocabulary','sentence'].includes(deckId) ? new Set(result.cards.flatMap(card => card.categories || [])).size : null,
+    categories: ['vocabulary','sentence','variation'].includes(deckId) ? new Set(result.cards.flatMap(card => card.categories || [])).size : null,
     columns,
   };
 }

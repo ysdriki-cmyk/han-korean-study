@@ -5,6 +5,8 @@ import {cachedSheetCSV,validContentCSV} from '../functions/_lib/content-cache.js
 const source='https://docs.google.com/spreadsheets/d/e/cache-tests/pub?gid=1&output=csv';
 const old='id_sentence,例文_韓国語,例文_日本語\n1,안녕,こんにちは';
 const latest=old.replace('こんにちは','こんにちは！');
+const variationHeader='id_sentence,セットID,セット名,順番,変形タイプ,練習指示,例文_韓国語,例文_日本語';
+const variation=`${variationHeader}\nv_1,eat,食べた,1,基本文,友達に伝える,김밥을 먹었어.,キンパを食べた。\nv_2,eat,食べた,2,時間を足す,昨日を足す,어제 김밥을 먹었어.,昨日キンパを食べた。`;
 class MemoryCache{
   map=new Map();
   async match(key){return this.map.get(key.url)?.clone();}
@@ -53,6 +55,55 @@ test('public export validation rejects empty/malformed content and accepts all c
   assert.equal(validContentCSV('kanji','id_one,韓国語,漢字\n1,가,家'),true);
   assert.equal(validContentCSV('vocabulary','id,韓国語,英語\n1,가게,shop'),true);
   assert.equal(validContentCSV('category_enshu','category_id,カテゴリ名,教材,対象列,条件,値,条件の結合,表示順\na,全件,sentence,,全件,,AND,1'),true);
+});
+
+test('dedicated variation exports accept untagged lessons and reject partial or ambiguous families',()=>{
+  assert.equal(validContentCSV('variation',variation),true);
+  assert.equal(validContentCSV('variation',`${variationHeader},ジャンル\nv_1,eat,食べた,1,基本文,友達に伝える,김밥을 먹었어.,キンパを食べた。,#variation #食事`),true);
+  for(const invalid of [
+    '読み込んでいます...',
+    variationHeader,
+    old,
+    variation+'\nv_3,eat,食べた,3,否定にする,否定にする,김밥을 안 먹었어.,',
+    variation+'\nv_3,,食べた,3,否定にする,否定にする,김밥을 안 먹었어.,キンパを食べなかった。',
+    variation+'\nv_3,eat,食べた,0,否定にする,否定にする,김밥을 안 먹었어.,キンパを食べなかった。',
+    variation+'\nv_1,eat,食べた,3,否定にする,否定にする,김밥을 안 먹었어.,キンパを食べなかった。',
+    variation+'\nv_3,eat,食べた,2,否定にする,否定にする,김밥을 안 먹었어.,キンパを食べなかった。',
+    `${variationHeader},ジャンル\nv_1,eat,食べた,1,基本文,友達に伝える,김밥을 먹었어.,キンパを食べた。,#conversation`,
+    `${variationHeader},ジャンル\nv_1,eat,食べた,1,基本文,友達に伝える,김밥을 먹었어.,キンパを食べた。,#subtitle`,
+    `${variationHeader},ターン,話者\nv_1,eat,食べた,1,基本文,友達に伝える,김밥을 먹었어.,キンパを食べた。,1,A`,
+  ]) assert.equal(validContentCSV('variation',invalid),false,invalid);
+});
+
+test('variation shared cache is independent and stale malformed lessons retain the complete previous CSV',async t=>{
+  const f=setup();
+  const variationContext={...f.context,request:new Request('https://study.test/api/content/variation')};
+  t.mock.method(globalThis,'fetch',async()=>response(old));
+  await cachedSheetCSV(f.context,source,'sentence',f);
+  globalThis.fetch=async()=>response(variation);
+  const initial=await cachedSheetCSV(variationContext,source,'variation',f);
+  assert.equal(initial.headers.get('X-Content-Cache'),'MISS');
+  assert.equal(await initial.text(),variation);
+  assert.equal(f.cache.map.size,2);
+  const savedSentence=await cachedSheetCSV(f.context,source,'sentence',f);
+  assert.equal(savedSentence.headers.get('X-Content-Cache'),'HIT');
+  assert.equal(await savedSentence.text(),old);
+
+  const duplicateOrder=variation+'\nv_3,eat,食べた,2,否定にする,否定にする,김밥을 안 먹었어.,キンパを食べなかった。';
+  f.advance(300001);
+  globalThis.fetch=async()=>response(duplicateOrder);
+  const stale=await cachedSheetCSV(variationContext,source,'variation',f);
+  assert.equal(stale.headers.get('X-Content-Cache'),'STALE');
+  assert.equal(await stale.text(),variation);
+  await Promise.all(f.pending);
+  const stored=[...f.cache.map.entries()].find(([key])=>new URL(key).pathname.endsWith('/variation'))?.[1];
+  assert.equal(await stored.clone().text(),variation);
+  const sentenceStored=[...f.cache.map.entries()].find(([key])=>new URL(key).pathname.endsWith('/sentence'))?.[1];
+  assert.equal(await sentenceStored.clone().text(),old);
+
+  const anotherSource=source.replace('gid=1','gid=1475350480');
+  assert.equal((await cachedSheetCSV(variationContext,anotherSource,'variation',f)).status,502);
+  assert.equal(f.cache.map.size,2);
 });
 
 test('simultaneous cold requests share one upstream fetch and retain separate response bodies',async t=>{

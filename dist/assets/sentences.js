@@ -1,7 +1,8 @@
 import { normalizeVocabulary, acceptedVocabularyAnswers } from './vocabulary.js';
 import { parseCSV } from './core.js';
 import { categoryLabels, sheetHeader } from './sheet-fields.js';
-import { normalizeConversationMetadata } from './conversations.js?v=2';
+import { normalizeConversationMetadata } from './conversations.js?v=3';
+import { normalizeVariationMetadata } from './variations.js?v=2';
 
 const clean = value => String(value ?? '').normalize('NFC').trim();
 const normalizeAnswer = value => clean(value).normalize('NFKC').toLowerCase().replace(/\s+/gu, '').replace(/[。.!！?？]+$/u, '');
@@ -33,39 +34,67 @@ export function sentencesFromVocabulary(words) {
   }));
 }
 
-export function normalizeSentences(text) {
+export function normalizeSentences(text, {collection} = {}) {
+  const dedicatedVariation = collection === 'variation';
   const rows = parseCSV(text), headers = (rows[0] || []).map(value => sheetHeader(value).normalize('NFKC'));
-  if (!headers.includes('id_sentence') && headers.includes('韓国語')) {
+  if (!dedicatedVariation && !headers.includes('id_sentence') && headers.includes('韓国語')) {
     const source = normalizeVocabulary(text);
     return { ...source, cards: sentencesFromVocabulary(source.cards).map(card => ({ ...card, id: card.sourceId,
       mainKorean: card.sourceWord.han, mainWordId: String(card.sourceWord.sourceId ?? card.sourceWord.id).replace(/^vocabulary:/u,''),
       sentenceRefs: [{position:1,korean:card.sourceWord.han,wordId:String(card.sourceWord.sourceId ?? card.sourceWord.id).replace(/^vocabulary:/u,''),surface:'',translation:''}],
     })) };
   }
-  for (const header of ['id_sentence','例文_韓国語','例文_日本語']) {
-    if (headers.filter(value => value === header).length !== 1) throw new Error(`sentence CSVに一意の「${header}」列が必要です。`);
+  const requiredHeaders = ['id_sentence','例文_韓国語','例文_日本語', ...(dedicatedVariation ? ['セットID','順番'] : [])];
+  for (const header of requiredHeaders) {
+    const expected = sheetHeader(header).normalize('NFKC');
+    if (headers.filter(value => value === expected).length !== 1) throw new Error(`${dedicatedVariation ? 'variation' : 'sentence'} CSVに一意の「${header}」列が必要です。`);
   }
   const numbered = headers.map((header,index) => ({match:/^使用韓国語_([1-9][0-9]*)$/u.exec(header),index})).filter(item=>item.match)
     .map(item=>({position:Number(item.match[1]),column:item.index})).sort((a,b)=>a.position-b.position);
   if (new Set(numbered.map(item=>item.position)).size !== numbered.length) throw new Error('使用韓国語の番号列が重複しています。');
-  const cards = [], warnings = [], ids = new Set(); let excludedRows = 0;
+  const cards = [], warnings = [], ids = new Set(), variationOrders = new Map(); let excludedRows = 0;
   for (let index=1;index<rows.length;index++) {
     const row=rows[index]; if (row.every(value=>!clean(value))) continue;
     const value = header => clean(row[headers.indexOf(sheetHeader(header).normalize('NFKC'))]);
     const id=value('id_sentence'), han=value('例文_韓国語'), kanji=value('例文_日本語');
-    if (!id || !han || !kanji) { excludedRows++; warnings.push(`${index+1}行目: ID・韓国語例文・日本語例文が必要です。`); continue; }
+    if (!id || !han || !kanji) {
+      if (dedicatedVariation) throw new Error(`${index+1}行目: variationにはID・韓国語例文・日本語例文が必要です。`);
+      excludedRows++; warnings.push(`${index+1}行目: ID・韓国語例文・日本語例文が必要です。`); continue;
+    }
     if (ids.has(id)) throw new Error(`${index+1}行目: id_sentence「${id}」が重複しています。`);
     ids.add(id);
     const sentenceRefs=numbered.map(({position,column})=>({position,korean:clean(row[column]),wordId:value(`使用単語ID_${position}`),surface:value(`文中表記_${position}`),translation:value(`文中訳_${position}`)}))
       .filter(ref=>ref.korean || ref.wordId);
-    const tags=value('ジャンル') || value('カテゴリ');
+    let tags=value('ジャンル') || value('カテゴリ');
     const conversation=normalizeConversationMetadata({lessonId:value('セットID'),situation:value('シチュエーション'),
       category:value('会話カテゴリ') || value('カテゴリ'),categoryNo:value('カテゴリ番号'),turn:value('ターン'),speaker:value('話者'),
       role:value('会話の役割'),speechStyle:value('話し方'),audience:value('距離感・対象'),priority:value('学習優先度'),usageNote:value('使い方メモ'),wordTags:value('単語由来タグ')});
+    const labels=categoryLabels(tags).map(tag=>tag.normalize('NFKC').toLowerCase());
+    if (dedicatedVariation) {
+      if (labels.includes('conversation') || labels.includes('subtitle') || (value('ターン') && value('話者'))) {
+        throw new Error(`${index+1}行目: variation専用CSVに会話・字幕の行は指定できません。`);
+      }
+      if (!labels.includes('variation')) tags = tags ? `${tags} #variation` : '#variation';
+    }
+    const isVariation=dedicatedVariation || (labels.includes('variation') && !labels.includes('conversation') && !(conversation.turn && conversation.speaker));
+    const variation=isVariation ? normalizeVariationMetadata({groupId:value('セットID'),title:value('セット名'),order:value('順番'),
+      type:value('変形タイプ'),instruction:value('練習指示'),point:value('変化ポイント'),answerVariants:value('別解_韓国語'),
+      speechStyle:value('話し方'),audience:value('距離感・対象'),usageNote:value('使い方メモ'),category:value('カテゴリ')}) : null;
+    if (isVariation) {
+      if (!variation.groupId || !variation.order) {
+        if (dedicatedVariation) throw new Error(`${index+1}行目: variationにはセットIDと正の整数の順番が必要です。`);
+        excludedRows++; warnings.push(`${index+1}行目: variationにはセットIDと正の整数の順番が必要です。`); continue;
+      }
+      if (!variationOrders.has(variation.groupId)) variationOrders.set(variation.groupId,new Set());
+      const orders=variationOrders.get(variation.groupId);
+      if (orders.has(variation.order)) throw new Error(`${index+1}行目: variationのセット「${variation.groupId}」の順番「${variation.order}」が重複しています。`);
+      orders.add(variation.order);
+    }
     cards.push({id,han,kanji,hanja:'',meaning:'',english:'',state:'',flagged:false,kind:'sentence',exampleKo:'',exampleJp:'',answerVariants:[],synonyms:'',
       notes:value('備考'),translation2:value('訳2'),tags,categories:categoryLabels(tags),mainKorean:value('使用韓国語_main'),mainWordId:value('使用単語ID_main'),sentenceRefs,
-      ...(Object.keys(conversation).length ? {conversation} : {})});
+      ...(Object.keys(conversation).length ? {conversation} : {}),...(variation ? {variation} : {})});
   }
+  if (dedicatedVariation && !cards.length) throw new Error('variation CSVに学習できる文章がありません。');
   return {cards,warnings,excludedRows};
 }
 

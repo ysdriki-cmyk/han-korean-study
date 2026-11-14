@@ -2,12 +2,19 @@ import {proxySheetCSV} from '../api/cards.js';
 import {parseCSV} from '../../dist/assets/core.js';
 import {sheetHeader} from '../../dist/assets/sheet-fields.js';
 import {parseCategorySheet} from '../../dist/assets/category-sheet.js';
+import {parseVariationContent} from '../../dist/assets/variation-content.js';
 
 const FRESH_MS=5*60*1000, RETAIN_SECONDS=24*60*60;
 const inFlight=new Map();
 
 /** Reject Google's loading/error exports before replacing a known-good CSV. */
 export function validContentCSV(kind,text) {
+  if(kind==='variation') {
+    try {
+      const result=parseVariationContent(text);
+      return result.cards.length>0 && result.warnings.length===0 && result.excludedRows===0;
+    } catch { return false; }
+  }
   if(kind==='category_enshu') {
     const result=parseCategorySheet(text);
     return result.sets.length>0 && result.warnings.length===0;

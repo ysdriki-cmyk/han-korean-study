@@ -1,4 +1,4 @@
-import { isConversationSentence } from './sentence-collections.js?v=2';
+import { isConversationSentence } from './sentence-collections.js?v=3';
 import initialConversationMetadata from './conversation-metadata.js';
 
 const clean = value => String(value ?? '').normalize('NFC').trim();

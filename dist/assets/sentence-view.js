@@ -1,6 +1,6 @@
-import { resolveSentenceWords } from './sentences.js?v=5';
+import { resolveSentenceWords } from './sentences.js?v=7';
 import { speechButton } from './speech-view.js';
-import { findSentenceWordExamples } from './sentence-examples.js';
+import { findSentenceWordExamples } from './sentence-examples.js?v=3';
 import { RATINGS, UNSEEN, ratingFor } from './assessment.js?v=3';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
