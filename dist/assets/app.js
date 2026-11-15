@@ -23,9 +23,10 @@ import { enrichConversationCards, buildConversationLessons } from './conversatio
 import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, unpracticedConversationLessons, randomConversationLesson } from './conversation-filters.js?v=2';
 import { renderConversationSpeaker, renderConversationPrompt, renderConversationNotes } from './conversation-view.js?v=2';
 import { buildVariationLessons, matchVariationAnswer } from './variations.js?v=2';
+import { randomVariationLesson } from './variation-practice.js?v=1';
 import { parseVariationContent, combineSentenceSources } from './variation-content.js?v=2';
 import { renderVariationPrompt, renderVariationAnswer } from './variation-view.js?v=1';
-import { renderStudyHome } from './study-home.js?v=9';
+import { renderStudyHome } from './study-home.js?v=10';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
@@ -50,6 +51,7 @@ let selectedSetIds = { kanji: 'essential', vocabulary: 'all', sentence: 'default
 let homeQuery = '', homeGroup = 'all', homeSearchTimer;
 let sentenceCollection='core', sentenceSelections={core:'default:all',extra:'all',conversation:'',variation:''};
 let conversationFilters = {}, conversationDetailsOpen = false, lastConversationLessonId = '';
+let lastVariationLessonId = '';
 let variationData = null;
 let preferences = { courses: {} }, settings = practiceSettings(), deckData = new Map();
 let session = [], position = 0, revealed = false, writeResult = null, submitted = '';
@@ -222,6 +224,7 @@ function chooseStudySet(id, { list = false } = {}) {
   if (!set) return;
   selectedSetIds[activeDeck] = id;
   if (inConversation() && !list) lastConversationLessonId = id;
+  if (inVariation() && !list) lastVariationLessonId = id;
   settings.sessionType = 'practice'; settings.scope = 'all';
   selected.clear(); revealedRows.clear(); rankFilter = 'all'; page = 0;
   $('#library-search').value = '';
@@ -234,14 +237,18 @@ function startRandomConversationLesson() {
   const lesson = randomConversationLesson(candidates, { excludeId: lastConversationLessonId });
   if (lesson) chooseStudySet(lesson.id);
 }
+function startRandomVariationLesson() {
+  if (!inVariation()) return;
+  const lesson = randomVariationLesson(matchingVariationLessons(), { excludeId: lastVariationLessonId });
+  if (lesson) chooseStudySet(lesson.id);
+}
 function startDefaultPractice() {
   if (inConversation()) {
     startRandomConversationLesson();
     return;
   }
   if (inVariation()) {
-    const lesson = defaultVariationSet();
-    if (lesson) chooseStudySet(lesson.id);
+    startRandomVariationLesson();
     return;
   }
   const all = availableStudySets().find(set => set.kind === 'all');

@@ -24,7 +24,8 @@ test('variation remains available for repeated practice and has no conversation 
     conversationFilters: { priority: 'A' }, conversationFilterOptions: { priority: ['A'] } });
   assert.ok(html.includes('data-sentence-collection="core"'));
   assert.ok(html.includes('variation<span>のセット</span>'));
-  assert.ok(html.includes('一つの文を、少しずつ変えて練習します。'));
+  assert.ok(html.includes('セットをランダムに選び、原型から派生の順に練習します。'));
+  assert.ok(html.includes('title="セットをランダムに選んで開始"'));
   assert.ok(html.includes('data-start-practice>練習を開始する'));
   assert.ok(html.includes('data-start-set="variation:eat"'));
   assert.ok(!html.includes('data-start-set="variation:eat" disabled'));
