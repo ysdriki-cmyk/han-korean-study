@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { renderStudyHome } from '../dist/assets/study-home.js';
+import { setProgress } from '../dist/assets/study-sets.js';
 
 const courses = [{ id: 'sentence', label: 'sentence', count: 772 }];
 const families = [
@@ -19,14 +20,14 @@ test('sentence home places variation after conversation and keeps its family and
   assert.ok(!html.includes('data-sentence-collection="variation" disabled'));
 });
 
-test('variation remains available for repeated practice and has no conversation controls', () => {
+test('practiced variation remains available individually while the random start requires unpracticed sets', () => {
   const html = render({ sentenceCollection: 'variation', sets: [families[0]], canResume: true,
     conversationFilters: { priority: 'A' }, conversationFilterOptions: { priority: ['A'] } });
   assert.ok(html.includes('data-sentence-collection="core"'));
   assert.ok(html.includes('variation<span>のセット</span>'));
-  assert.ok(html.includes('セットをランダムに選び、原型から派生の順に練習します。'));
-  assert.ok(html.includes('title="セットをランダムに選んで開始"'));
-  assert.ok(html.includes('data-start-practice>練習を開始する'));
+  assert.ok(html.includes('未演習のセットをランダムに選び、原型から派生の順に練習します。'));
+  assert.ok(html.includes('title="未演習のセットをランダムに選んで開始"'));
+  assert.ok(html.includes('data-start-practice disabled>未演習のセットはありません'));
   assert.ok(html.includes('data-start-set="variation:eat"'));
   assert.ok(!html.includes('data-start-set="variation:eat" disabled'));
   assert.ok(html.includes('で変形を練習"'));
@@ -48,10 +49,45 @@ test('empty variation is disabled and search only starts visible nonempty famili
   assert.ok(noResults.includes('data-start-practice disabled'));
   const found = render({ sentenceCollection: 'variation', sets: families, query: 'キンパ' });
   assert.ok(found.includes('1 セット'));
-  assert.ok(found.includes('data-start-practice>練習を開始する'));
+  assert.ok(found.includes('data-start-practice disabled>未演習のセットはありません'));
+  assert.ok(found.includes('data-start-set="variation:eat"'));
   assert.ok(!found.includes('data-start-set="variation:go"'));
+  const fresh = render({ sentenceCollection: 'variation', sets: families, query: '学校' });
+  assert.ok(fresh.includes('data-start-practice>練習を開始する'));
+  assert.ok(!fresh.includes('data-start-set="variation:eat"'));
   const unavailable = render({ courses: [{ ...courses[0], available: false }], sentenceCollection: 'variation', sets: families });
   assert.ok(unavailable.includes('data-start-practice disabled'));
+});
+
+test('only matching unpracticed sets enable random start while all individual sets stay visible',()=>{
+  const mixed=render({sentenceCollection:'variation',sets:families});
+  assert.ok(mixed.includes('data-start-practice>練習を開始する'));
+  assert.ok(mixed.includes('data-start-set="variation:eat"'));
+  assert.ok(mixed.includes('data-start-set="variation:go"'));
+  const practicedGroup=render({sentenceCollection:'variation',sets:families,group:'食事'});
+  assert.ok(practicedGroup.includes('data-start-practice disabled>未演習のセットはありません'));
+  assert.ok(!practicedGroup.includes('data-start-set="variation:go"'));
+  const freshGroup=render({sentenceCollection:'variation',sets:families,group:'移動'});
+  assert.ok(freshGroup.includes('data-start-practice>練習を開始する'));
+});
+
+test('home eligibility follows direction-specific attempts rather than visible rating symbols',()=>{
+  const members=[{id:'sentence:one',han:'가요'},{id:'sentence:two',han:'갔어요'}];
+  const records={
+    'sentence:one':{assessments:{read:{rating:'unseen',attempts:1},write:{rating:'solid',attempts:0}}},
+    'sentence:two':{assessments:{write:{rating:'good',attempts:0,ratingEditedAt:'2026-11-17T00:00:00Z'}}},
+  };
+  const before=JSON.stringify(records);
+  const renderDirection=mode=>{
+    const progress=setProgress(members,records,mode);
+    return render({sentenceCollection:'variation',mode,sets:[{...families[0],...progress,unpracticed:progress.attempted===0}]});
+  };
+  const read=renderDirection('read');
+  assert.ok(read.includes('data-start-practice disabled>未演習のセットはありません'));
+  assert.ok(!read.includes('data-start-set="variation:eat" disabled'));
+  const write=renderDirection('write');
+  assert.ok(write.includes('data-start-practice>練習を開始する'));
+  assert.equal(JSON.stringify(records),before);
 });
 
 test('variation titles, IDs and search input are escaped', () => {

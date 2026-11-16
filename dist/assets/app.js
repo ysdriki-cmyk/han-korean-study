@@ -23,10 +23,10 @@ import { enrichConversationCards, buildConversationLessons } from './conversatio
 import { conversationFilterOptions, normalizeConversationFilters, conversationLessonSearchText, filterConversationLessons, unpracticedConversationLessons, randomConversationLesson } from './conversation-filters.js?v=2';
 import { renderConversationSpeaker, renderConversationPrompt, renderConversationNotes } from './conversation-view.js?v=2';
 import { buildVariationLessons, matchVariationAnswer } from './variations.js?v=2';
-import { randomVariationLesson } from './variation-practice.js?v=1';
+import { randomVariationLesson, unpracticedVariationLessons } from './variation-practice.js?v=2';
 import { parseVariationContent, combineSentenceSources } from './variation-content.js?v=2';
 import { renderVariationPrompt, renderVariationAnswer } from './variation-view.js?v=1';
-import { renderStudyHome } from './study-home.js?v=10';
+import { renderStudyHome } from './study-home.js?v=11';
 import { parseCategorySheet } from './category-sheet.js?v=2';
 import { parseWordKanjiReferences, findWordKanjiReferences } from './word-kanji.js';
 import { applyBulkRating, undoBulkRating } from './bulk-rating.js';
@@ -239,7 +239,8 @@ function startRandomConversationLesson() {
 }
 function startRandomVariationLesson() {
   if (!inVariation()) return;
-  const lesson = randomVariationLesson(matchingVariationLessons(), { excludeId: lastVariationLessonId });
+  const candidates = unpracticedVariationLessons(matchingVariationLessons(), records, settings.mode);
+  const lesson = randomVariationLesson(candidates, { excludeId: lastVariationLessonId });
   if (lesson) chooseStudySet(lesson.id);
 }
 function startDefaultPractice() {

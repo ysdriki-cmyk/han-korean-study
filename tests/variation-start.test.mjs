@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { randomVariationLesson } from '../dist/assets/variation-practice.js';
+import { randomVariationLesson, unpracticedVariationLessons } from '../dist/assets/variation-practice.js';
 import { buildVariationLessons } from '../dist/assets/variations.js';
 import { buildStudySets, cardsForStudySet } from '../dist/assets/study-sets.js';
-import { ratingFor } from '../dist/assets/assessment.js';
+import { ratingFor, recordAssessment } from '../dist/assets/assessment.js';
+import { getRecord } from '../dist/assets/learning.js';
+import { applyBulkRating } from '../dist/assets/bulk-rating.js';
 
 const card=(group,order,category)=>({
   id:`sentence:${group}-${order}`,sourceId:`${group}-${order}`,deckId:'sentence',tags:'#variation',
@@ -41,6 +43,33 @@ test('random starts avoid the last set when possible, reuse a sole candidate and
   assert.equal(randomVariationLesson(mixed,{random:()=>.999}),lessons[1]);
 });
 
+test('unpracticed sets require every sentence to have zero actual attempts in the selected direction',()=>{
+  const attempted=recordAssessment(getRecord(cards.find(item=>item.id==='sentence:a-2')),'read','unseen',{correct:null,now:'2026-11-17T00:00:00Z'});
+  const records={
+    'sentence:a-2':attempted,
+    'sentence:b-1':{assessments:{write:{rating:'good',attempts:1}}},
+    'sentence:c-2':{assessments:{read:{rating:'solid',attempts:0,ratingEditedAt:'2026-11-16T00:00:00Z'}}},
+  };
+  const before=JSON.stringify({lessons,records});
+  assert.equal(attempted.assessments.read.rating,'unseen');
+  assert.equal(attempted.assessments.read.attempts,1);
+  assert.deepEqual(ids(unpracticedVariationLessons(lessons,records,'read')),['variation:b','variation:c']);
+  assert.deepEqual(ids(unpracticedVariationLessons(lessons,records,'write')),['variation:a','variation:c']);
+  assert.equal(unpracticedVariationLessons(lessons,records,'read')[0],lessons[1]);
+  assert.equal(JSON.stringify({lessons,records}),before);
+  for(const invalid of [null,undefined,[],{},[null,{}, {cards:[]},{cards:null}]])assert.deepEqual(unpracticedVariationLessons(invalid),[]);
+});
+
+test('manual rating edits do not count as practice, while recorded history without a counter does',()=>{
+  const edited=applyBulkRating(cards,{},ids(cards),'read','solid','2026-11-17T00:00:00Z').records;
+  const before=JSON.stringify(edited);
+  assert.deepEqual(ids(unpracticedVariationLessons(lessons,edited,'read')),ids(lessons));
+  assert.equal(JSON.stringify(edited),before);
+  const historyOnly={...edited,'sentence:a-3':{assessments:{read:{rating:'unseen',history:[{correct:null,at:'2026-11-17T00:00:00Z'}]}}}};
+  assert.deepEqual(ids(unpracticedVariationLessons(lessons,historyOnly,'read')),['variation:b','variation:c']);
+  assert.deepEqual(ids(unpracticedVariationLessons(lessons,historyOnly,'write')),ids(lessons));
+});
+
 const appSource=readFileSync(new URL('../dist/assets/app.js',import.meta.url),'utf8');
 function appFunction(name) {
   const start=appSource.indexOf(`function ${name}(`);
@@ -50,15 +79,11 @@ function appFunction(name) {
 }
 
 /** Execute the actual app handlers, while keeping rendering and storage outside this unit. */
-function application({query='',group='all',sample=.999,availableIds=null}={}) {
+function application({query='',group='all',sample=.999,availableIds=null,recordState={}}={}) {
   let randomSample=sample,spoken=0;
   const choices=[],preferenceWrites=[],search={value:'existing search'};
   const sets=buildStudySets('sentence',cards,[],{collection:'variation'}).filter(set=>!availableIds || availableIds.includes(set.id));
-  const records=Object.fromEntries(cards.map(item=>[item.id,{assessments:{read:{
-    rating:item.variation.groupId==='b'?'unseen':'solid',attempts:item.variation.groupId==='b'?0:4,
-    history:item.variation.groupId==='b'?[]:[{rating:'solid',correct:true,at:'2026-11-01T00:00:00Z'}],
-    dueAt:'2026-12-01T00:00:00Z',
-  }}}]));
+  const records=structuredClone(recordState);
   const before=JSON.stringify(records);
   const context=vm.createContext({
     activeDeck:'sentence',sentenceCollection:'variation',homeQuery:query,homeGroup:group,
@@ -70,7 +95,7 @@ function application({query='',group='all',sample=.999,availableIds=null}={}) {
     initialCount:0,sessionScope:'all',hintSeeds:new Map(),position:0,revealed:false,writeResult:null,submitted:'',
     answers:new Map(),cardViews:new Map(),advancedPositions:new Set(),
     $:()=>search,
-    buildVariationLessons,cardsForStudySet,
+    buildVariationLessons,cardsForStudySet,unpracticedVariationLessons,
     availableStudySets:()=>sets,
     rank:item=>ratingFor(item,records,'read'),
     randomVariationLesson:(candidates,options)=>{
@@ -96,7 +121,7 @@ function application({query='',group='all',sample=.999,availableIds=null}={}) {
   };
 }
 
-test('the actual start button selects random sets, includes practiced ones and keeps base-to-derived order',()=>{
+test('the actual start button randomly selects complete unpracticed sets and keeps base-to-derived order',()=>{
   const app=application({sample:.999});
   app.handlers.startDefaultPractice();
   assert.equal(app.context.selectedSetIds.sentence,'variation:c');
@@ -106,7 +131,7 @@ test('the actual start button selects random sets, includes practiced ones and k
   assert.equal(app.context.position,0);
   assert.equal(app.context.sessionLesson.baseCard.id,'sentence:c-1');
   assert.deepEqual(app.choices,[{ids:['variation:a','variation:b','variation:c'],excludeId:''}]);
-  // The deterministic default would select the unseen b set. A practiced a must remain eligible.
+  // The draw remains random at set level, with no sentence shuffle or one-card limit.
   app.sample=0;
   app.handlers.startDefaultPractice();
   assert.equal(app.context.selectedSetIds.sentence,'variation:a');
@@ -114,6 +139,25 @@ test('the actual start button selects random sets, includes practiced ones and k
   assert.equal(app.choices.at(-1).excludeId,'variation:c');
   assert.equal(JSON.stringify(app.context.records),app.before);
   assert.equal(app.spoken,2);
+});
+
+test('the actual start button filters partial attempts by direction while keeping manually rated sets eligible',()=>{
+  const recordState={
+    'sentence:a-2':{assessments:{read:{rating:'unseen',attempts:1,history:[{correct:null,at:'2026-11-17T00:00:00Z'}]}}},
+    'sentence:b-1':{assessments:{read:{rating:'solid',attempts:0,ratingEditedAt:'2026-11-16T00:00:00Z'}}},
+    'sentence:c-1':{assessments:{write:{rating:'good',attempts:1}}},
+  };
+  const app=application({recordState,sample:.999});
+  app.handlers.startDefaultPractice();
+  assert.deepEqual(app.choices[0].ids,['variation:b','variation:c']);
+  assert.equal(app.context.selectedSetIds.sentence,'variation:c');
+  app.context.settings.mode='write';
+  app.sample=0;
+  app.handlers.startDefaultPractice();
+  assert.deepEqual(app.choices[1].ids,['variation:a','variation:b']);
+  assert.equal(app.context.selectedSetIds.sentence,'variation:a');
+  assert.deepEqual(ids(app.context.session),['sentence:a-1','sentence:a-2','sentence:a-3']);
+  assert.equal(JSON.stringify(app.context.records),app.before);
 });
 
 test('random starts respect the actual search/category/set boundaries without falling back to unrelated sets',()=>{
@@ -134,6 +178,12 @@ test('random starts respect the actual search/category/set boundaries without fa
   restricted.handlers.startDefaultPractice();
   assert.deepEqual(restricted.choices[0].ids,['variation:b']);
   assert.equal(restricted.context.selectedSetIds.sentence,'variation:b');
+  const practicedMatch=application({group:'移動',recordState:{'sentence:c-1':{assessments:{read:{rating:'unseen',attempts:1}}}}});
+  practicedMatch.handlers.startDefaultPractice();
+  assert.deepEqual(practicedMatch.choices[0].ids,[]);
+  assert.equal(practicedMatch.context.selectedSetIds.sentence,'');
+  assert.equal(practicedMatch.context.session.length,0);
+  assert.equal(practicedMatch.preferenceWrites.length,0);
 });
 
 test('explicit practice affects the next exclusion while list previews and session preparation do not',()=>{
@@ -151,5 +201,30 @@ test('explicit practice affects the next exclusion while list previews and sessi
   app.handlers.startDefaultPractice();
   assert.equal(app.choices.at(-1).excludeId,'variation:a');
   assert.equal(app.context.selectedSetIds.sentence,'variation:b');
+  assert.equal(JSON.stringify(app.context.records),app.before);
+});
+
+test('no unpracticed matches never falls back, while explicit set practice and repeating still work',()=>{
+  const recordState=Object.fromEntries(lessons.map(lesson=>[lesson.cards[0].id,{assessments:{read:{rating:'unseen',attempts:1}}}]));
+  const app=application({recordState});
+  app.handlers.startDefaultPractice();
+  assert.deepEqual(app.choices,[{ids:[],excludeId:''}]);
+  assert.equal(app.context.view,'home');
+  assert.equal(app.context.selectedSetIds.sentence,'');
+  assert.equal(app.context.session.length,0);
+  assert.equal(app.preferenceWrites.length,0);
+  assert.equal(app.spoken,0);
+  app.handlers.chooseStudySet('variation:a');
+  assert.equal(app.context.view,'study');
+  assert.deepEqual(ids(app.context.session),['sentence:a-1','sentence:a-2','sentence:a-3']);
+  app.context.position=2;
+  app.handlers.startSession(null,{autoplay:true});
+  assert.equal(app.context.position,0);
+  assert.deepEqual(ids(app.context.session),['sentence:a-1','sentence:a-2','sentence:a-3']);
+  const session=app.context.session,writes=app.preferenceWrites.length;
+  app.handlers.startDefaultPractice();
+  assert.deepEqual(app.choices.at(-1).ids,[]);
+  assert.equal(app.context.session,session);
+  assert.equal(app.preferenceWrites.length,writes);
   assert.equal(JSON.stringify(app.context.records),app.before);
 });
