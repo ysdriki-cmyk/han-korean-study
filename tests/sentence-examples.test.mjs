@@ -43,9 +43,13 @@ test('unregistered exact references work and a refreshed word dictionary supplie
 test('compact word tables keep English and examples in a separate escaped sheet',()=>{
   const current=sentences[0];
   const html=renderSentenceWords(current,words);
-  assert.ok(html.includes('<th scope="col">原形</th><th scope="col">日本語</th>'));
+  assert.match(html,/<th scope="col">[^]*原形[^]*<th scope="col">日本語<\/th>/u);
   assert.ok(html.includes('data-sentence-word-open="0"'));
   assert.ok(html.includes('aria-haspopup="dialog"'));
+  assert.ok(html.includes('data-speak="쓰다"'));
+  assert.match(html,/data-sentence-word-mode="write"/u);
+  assert.match(html,/data-sentence-word-status="0"[^>]*aria-expanded="false"/u);
+  assert.doesNotMatch(html,/<button[^>]*data-sentence-word-status="0"[^>]*aria-haspopup="dialog"/u);
   assert.ok(!html.includes('lang="en"'));
   assert.ok(!html.includes('sentence-example-row'));
   assert.ok(!html.includes('メモを書きます。'));
@@ -97,7 +101,8 @@ test('homonyms have individual statuses and missing words cannot write vocabular
   assert.deepEqual(edited['vocabulary:2'],records['vocabulary:2']);
   for(const field of ['attempts','correct','wrong','lastAt','history','dueAt'])assert.deepEqual(edited['vocabulary:1'].assessments.read[field],record.assessments.read[field]);
   assert.equal(JSON.stringify(records),before);
-  assert.match(renderSentenceWords(ambiguous,words,edited,'write'),/単語 · 쓰기/);
+  assert.match(renderSentenceWords(ambiguous,words,edited,'write'),/data-sentence-word-mode="read"/);
+  assert.match(renderSentenceWords(ambiguous,words,edited,'write'),/쓰기/);
   assert.match(renderSentenceWords(ambiguous,words,edited,'write'),/쓰기 ◎ 完璧/);
   const missing=renderSentenceWords(sentences[7],words);
   assert.match(missing,/data-sentence-word-status="0"[^>]* disabled/);

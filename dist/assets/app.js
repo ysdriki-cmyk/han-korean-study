@@ -1,7 +1,7 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=10';
 import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=8';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=11';
-import { createSentenceWordSheet } from './sentence-word-sheet.js?v=5';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=12';
+import { createSentenceWordSheet } from './sentence-word-sheet.js?v=6';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -89,6 +89,7 @@ const sentenceWordSheet=createSentenceWordSheet({
     records,mode:sentenceWordMode||settings.mode,
   }),
   stopSpeech:()=>speaker.stop(),
+  onInlineChange:()=>refreshSentenceWordList(),
   onMode:mode=>{sentenceWordMode=mode;refreshSentenceWordList();},
   onRating:(id,mode,rating)=>{
     const word=deckData.get('vocabulary')?.cards.find(card=>card.id===id);
@@ -103,7 +104,7 @@ const sentenceWordSheet=createSentenceWordSheet({
 function refreshSentenceWordList() {
   const list=$('#flashcard .sentence-word');
   if(!list || !session[position])return;
-  list.outerHTML=renderSentenceWords(session[position],deckData.get('vocabulary')?.cards||[],records,sentenceWordMode||settings.mode);
+  list.outerHTML=renderSentenceWords(session[position],deckData.get('vocabulary')?.cards||[],records,sentenceWordMode||settings.mode,sentenceWordSheet.inlineState());
 }
 
 function readJSON(key, fallback) {
@@ -462,7 +463,7 @@ function renderCard() {
   actions += cardNavigation();
   const input = writing && !revealed ? `<form id="write-form" class="write-form"><label class="writing-input-label" for="hangul-input">韓国語で書く</label>${activeDeck === 'sentence' ? `<textarea id="hangul-input" rows="3" placeholder="韓国語の例文を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false">${esc(submitted)}</textarea>` : `<input id="hangul-input" placeholder="ここに韓国語を入力" lang="ko" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(submitted)}">`}</form>` : !writing && !revealed ? `<div class="write-form recall-form"><label class="writing-input-label" for="recall-input">答えを書いてみる</label><textarea id="recall-input" rows="2" placeholder="${esc(getDeck(activeDeck).answerLabel)}を入力（任意）" autocomplete="off">${esc(submitted)}</textarea></div>` : '';
   const result = revealed && (writing || submitted) ? `<div class="result-banner${writeResult === null ? ' unanswered' : writeResult ? '' : ' wrong'}" role="status">${writeResult === null ? '<span class="rating-symbol">ー</span>' : icon(writeResult ? 'check-circle' : 'repeat')}<strong>${writeResult === null ? '未回答' : writeResult ? '正解' : '不正解'}</strong>${writeResult === null ? '' : '<span>自動採点</span>'}</div>${writing && submitted ? `<p class="write-submission">あなたの解答：<span lang="ko">${esc(submitted)}</span></p>` : ''}` : '';
-  const sentenceReference = revealed && activeDeck === 'sentence' ? renderSentenceWords(card, deckData.get('vocabulary')?.cards || [], records, sentenceWordMode||settings.mode) + (inConversation() ? renderConversationNotes(card) : '') : '';
+  const sentenceReference = revealed && activeDeck === 'sentence' ? renderSentenceWords(card, deckData.get('vocabulary')?.cards || [], records, sentenceWordMode||settings.mode,sentenceWordSheet.inlineState()) + (inConversation() ? renderConversationNotes(card) : '') : '';
   const lessonPrompt = inVariation() && sessionLesson ? renderVariationPrompt(sessionLesson, position, { mode: settings.mode }) : sessionLesson ? renderConversationPrompt(sessionLesson, position) : '';
   const variationAnswer = revealed && inVariation() ? renderVariationAnswer(card, sessionLesson?.baseCard) : '';
   el.innerHTML = `<div class="card-topline">${inConversation() && sessionLesson ? renderConversationSpeaker(card) : ''}${badge(selectedRating || rank(card))}</div>${lessonPrompt}<div class="question-area">${questionMarkup(card)}${input}</div>${result}${!writing && revealed && submitted ? `<p class="write-submission">あなたの解答：${esc(submitted)}</p>` : ''}${revealed ? `<div class="answer-panel${activeDeck === 'sentence' ? ' sentence-answer' : ''}">${answerRows(card)}</div>${variationAnswer}` : ''}<div class="card-action-area">${actions}</div>${sentenceReference ? `<div class="sentence-reference">${sentenceReference}</div>` : ''}${revealed && activeDeck !== 'sentence' ? (activeDeck === 'vocabulary' ? renderVocabularyExample(card, findWordKanjiReferences(wordKanjiReferences, card.han)) : renderTopikUsage(topikExamples, card.han, topikState)) : ''}`;
@@ -868,6 +869,7 @@ function handleCardAction(action) {
 }
 function bind() {
   document.addEventListener('click', event => {
+    if(sentenceWordSheet.inlineState() && !event.target.closest('.sentence-word'))sentenceWordSheet.close();
     const usageRow = event.target.closest('[data-usage-example-row]');
     const usageToggle = event.target.closest('[data-usage-toggle]') || (!event.target.closest('button,a,input,select,textarea') && usageRow?.querySelector('[data-usage-toggle]'));
     if (usageToggle) {
@@ -883,6 +885,8 @@ function bind() {
     const target = event.target.closest('button,a'); if (!target) return;
     if(target.hasAttribute('data-sentence-word-open')) { sentenceWordSheet.open(Number(target.dataset.sentenceWordOpen));return; }
     if(target.hasAttribute('data-sentence-word-status')) { sentenceWordSheet.open(Number(target.dataset.sentenceWordStatus),{status:true});return; }
+    if(target.dataset.sentenceWordRating) { sentenceWordSheet.rateInline(target.dataset.sentenceWordRating);return; }
+    if(target.dataset.sentenceWordMode) { sentenceWordSheet.setMode(target.dataset.sentenceWordMode);return; }
     if (target.dataset.homeDeck && loaded) { switchDeck(target.dataset.homeDeck); if(target.dataset.homeDeck==='sentence') switchSentenceCollection('core'); return; }
     if (target.dataset.sentenceCollection && loaded && activeDeck==='sentence') { switchSentenceCollection(target.dataset.sentenceCollection); return; }
     if (target.dataset.homeMode && loaded) { switchMode(target.dataset.homeMode); return; }
@@ -1001,6 +1005,7 @@ function bind() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) speaker.stop(); else if (loaded) refreshRemote(); });
   window.addEventListener('hashchange', () => setView(location.hash.slice(1), { hash: false }));
   document.addEventListener('keydown', event => {
+    if(event.key==='Escape' && sentenceWordSheet.isOpen()){event.preventDefault();sentenceWordSheet.close();return;}
     if (view !== 'study' || settings.mode !== 'read' || event.altKey || event.ctrlKey || event.metaKey || event.isComposing || $('#practice-settings').open || $('#bulk-rating-dialog').open || sentenceWordSheet.isOpen()) return;
     const target = event.target; if (target.closest('input,select,textarea,[contenteditable=true]')) return;
     if (event.code === 'Space' && !revealed && (!target.closest('button,a') || target.closest('#reveal-card'))) { event.preventDefault(); reveal(); }

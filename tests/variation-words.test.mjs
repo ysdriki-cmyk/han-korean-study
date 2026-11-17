@@ -46,6 +46,8 @@ test('dedicated variation numbered word columns use the shared ordered vocabular
   assert.match(html,/使用単語/u);
   assert.match(html,/data-sentence-word-open="9"/u);
   assert.match(html,/data-sentence-word-status="9"/u);
+  assert.match(html,/data-speak="먹다"/u);
+  assert.match(html,/data-sentence-word-mode="read"/u);
   assert.match(html,/먹다の単語ステータス：쓰기 ❌ もう一度/u);
   assert.doesNotMatch(html,/lang="en"/u);
   assert.equal(JSON.stringify(records),before);
@@ -83,7 +85,7 @@ test('the actual variation study card reveals word controls only after the answe
   assert.ok(start>=0 && render.includes('renderSentenceWords'));
   const element = {innerHTML:'',dataset:{},setAttribute(){},classList:{toggle(){}}};
   const context = vm.createContext({
-    speaker:{stop(){}},sentenceWordSheet:{refresh(){}},$:()=>element,loaded:true,cards:[card],session:[card],position:0,
+    speaker:{stop(){}},sentenceWordSheet:{refresh(){},inlineState:()=>null},$:()=>element,loaded:true,cards:[card],session:[card],position:0,
     settings:{mode:'write'},revealed:false,answers:new Map(),sessionLesson:buildVariationLessons([card])[0],
     activeDeck:'sentence',submitted:'',writeResult:null,sentenceWordMode:null,records,
     deckData:new Map([['vocabulary',{cards:words}]]),inConversation:()=>false,inVariation:()=>true,

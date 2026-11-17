@@ -55,7 +55,7 @@ test('dedicated sentence columns sort by number while main remains independent',
   assert.deepEqual(result.issues,[]);
   assert.equal(JSON.stringify(cards),before);
   const html=renderSentenceWords(cards[0],words);
-  assert.ok(html.includes('<th scope="col">原形</th><th scope="col">日本語'));
+  assert.match(html,/<th scope="col">[^]*原形[^]*<th scope="col">日本語/u);
   assert.equal((html.match(/class="sentence-main-row"/g)||[]).length,1);
   assert.ok(html.indexOf('얼굴') < html.indexOf('쓰다'));
   assert.ok(!html.includes('lang="en"'));

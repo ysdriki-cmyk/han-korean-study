@@ -25,7 +25,7 @@ export function sentenceWordEntries(card, words) {
   })):[{...row,key:`${index}:missing`,word:null}]);
 }
 
-export function renderSentenceWords(card, words, records={}, mode='read') {
+export function renderSentenceWords(card, words, records={}, mode='read', inline=null) {
   const entries=sentenceWordEntries(card,words);
   if (!entries.length) return '';
   const {rows,main}=resolveSentenceWords(card,words);
@@ -34,10 +34,13 @@ export function renderSentenceWords(card, words, records={}, mode='read') {
     const rating=row.word?ratingFor(row.word,records,mode):'unseen';
     const status=statuses.find(item=>item.id===rating)||UNSEEN;
     const statusLabel=row.word?`${row.lemma}の単語ステータス：${modeLabel(mode)} ${status.symbol} ${labels[status.id]}。変更する`:`${row.lemma}は単語帳に未登録`;
-    const statusButton=`<button type="button" class="sentence-word-status rating-${status.id}" data-sentence-word-status="${index}" aria-label="${esc(statusLabel)}" aria-haspopup="dialog"${row.word?'':' disabled'}><span class="rating-symbol">${status.symbol}</span></button>`;
-    return `<tr${row.main?' class="sentence-main-row"':''}><td>${statusButton}</td><td lang="ko"><button type="button" class="sentence-word-open" data-sentence-word-open="${index}" aria-label="${esc(row.lemma)}の意味と例文" aria-haspopup="dialog">${esc(row.lemma)}</button></td><td lang="ja">${esc(row.japanese)||'—'}</td></tr>`;
+    const expanded=Boolean(row.word && inline?.key===row.key);
+    const statusButton=`<button type="button" class="sentence-word-status rating-${status.id}" data-sentence-word-status="${index}" aria-label="${esc(statusLabel)}" aria-expanded="${expanded}"${expanded?` aria-controls="sentence-word-ratings-${index}"`:''}${row.word?'':' disabled'}><span class="rating-symbol">${status.symbol}</span></button>`;
+    const choices=expanded?`<tr class="sentence-word-rating-row"><td colspan="3"><div id="sentence-word-ratings-${index}" class="sentence-word-ratings" role="group" aria-label="${esc(row.lemma)}の${modeLabel(mode)}評価">${statuses.map(item=>`<button type="button" class="rating-${item.id}" data-sentence-word-rating="${item.id}" aria-label="${esc(row.lemma)}を${modeLabel(mode)} ${item.symbol} ${labels[item.id]}に変更" title="${esc(labels[item.id])}" aria-pressed="${rating===item.id}"><span class="rating-symbol" aria-hidden="true">${item.symbol}</span></button>`).join('')}</div>${inline.feedback?`<p class="sentence-word-feedback" role="alert">${esc(inline.feedback)}</p>`:''}</td></tr>`:'';
+    return `<tr${row.main?' class="sentence-main-row"':''}><td>${statusButton}</td><td lang="ko"><div class="sentence-word-lemma"><button type="button" class="sentence-word-open" data-sentence-word-open="${index}" aria-label="${esc(row.lemma)}の意味と例文" aria-haspopup="dialog">${esc(row.lemma)}</button>${speechButton(row.lemma)}</div></td><td lang="ja">${esc(row.japanese)||'—'}</td></tr>${choices}`;
   }).join('');
-  return `<section class="sentence-word"><div class="sentence-word-heading"><h3>使用単語</h3><span>単語 · ${modeLabel(mode)}</span></div>${separateMain}<div class="table-wrap"><table><thead><tr><th scope="col"><span class="sr-only">単語のステータス</span></th><th scope="col">原形</th><th scope="col">日本語</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
+  const nextMode=mode==='write'?'read':'write';
+  return `<section class="sentence-word"><div class="sentence-word-heading"><h3>使用単語</h3></div>${separateMain}<div class="table-wrap"><table><thead><tr><th scope="col"><button type="button" class="sentence-word-mode" data-sentence-word-mode="${nextMode}" aria-label="単語の評価方向：${modeLabel(mode)}。${modeLabel(nextMode)}に切り替える">${modeLabel(mode)}<span aria-hidden="true">↔</span></button></th><th scope="col">原形</th><th scope="col">日本語</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
 }
 
 /** A bounded page keeps every related example accessible without extending the study page. */
@@ -53,12 +56,6 @@ function renderWordRatings(row,records,mode) {
   return `<section class="word-sheet-status"><div class="word-sheet-status-heading"><h3>単語のステータス</h3><div class="word-sheet-modes" role="group" aria-label="単語の評価方向">${['read','write'].map(item=>`<button type="button" data-word-sheet-mode="${item}" aria-pressed="${mode===item}">${modeLabel(item)}</button>`).join('')}</div></div>
     ${row.word?`<div class="word-sheet-ratings" role="group" aria-label="単語のステータスを変更">${statuses.map(item=>`<button type="button" class="rating-${item.id}" data-word-sheet-rating="${item.id}" aria-label="${esc(row.lemma)}を${modeLabel(mode)} ${item.symbol} ${labels[item.id]}に変更" aria-pressed="${rating===item.id}"><span class="rating-symbol">${item.symbol}</span><span>${labels[item.id]}</span></button>`).join('')}</div>`:'<p class="word-sheet-unregistered">単語帳に未登録</p>'}
     <p class="word-sheet-feedback" role="status" aria-live="polite"></p></section>`;
-}
-
-/** A status tap offers only ratings and never looks up meanings or related examples. */
-export function renderSentenceWordStatus(row,records,mode) {
-  return `<header class="word-sheet-heading"><h2 id="sentence-word-title" lang="ko">${esc(row.lemma)}</h2><button type="button" class="icon-button" data-word-sheet-close aria-label="評価の選択を閉じる">×</button></header>
-    <div class="word-sheet-body">${renderWordRatings(row,records,mode)}</div>`;
 }
 
 export function renderSentenceWordSheet(row,words,sentences,card,records,mode,page=0) {
