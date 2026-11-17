@@ -1,7 +1,7 @@
 import { DECKS, getDeck, parseDeck, restoreLearningRecords, answerFields } from './decks.js?v=10';
 import { matchSentenceAnswer, linkSentenceWords } from './sentences.js?v=8';
-import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=12';
-import { createSentenceWordSheet } from './sentence-word-sheet.js?v=6';
+import { renderSentenceWords, renderSentenceTranslation2 } from './sentence-view.js?v=13';
+import { createSentenceWordSheet } from './sentence-word-sheet.js?v=7';
 import { matchVocabularyAnswer } from './vocabulary.js';
 import { parseTopikExamples, examplesFromVocabulary } from './topik.js';
 import { readContentSnapshot, writeContentCache } from './content-cache.js?v=2';
@@ -62,6 +62,7 @@ let answers = new Map(), hintSeeds = new Map(), initialCount = 0, sessionScope =
 let rankFilter = 'all', page = 0, selected = new Set(), revealedRows = new Set(), pageCards = [];
 let loaded = false, storageAvailable = true, polling = false, composing = false, compositionEndedAt = 0, toastTimer;
 let sentenceWordMode=null;
+let expandedLibrarySentenceId='',libraryWordMode=null;
 
 const speaker = createKoreanSpeaker({
   synthesis: window.speechSynthesis,
@@ -83,14 +84,11 @@ const speaker = createKoreanSpeaker({
 
 const sentenceWordSheet=createSentenceWordSheet({
   dialog:$('#sentence-word-dialog'),
-  getContext:()=>({
-    card:activeDeck==='sentence' && view==='study' && revealed?session[position]:null,
-    words:deckData.get('vocabulary')?.cards||[],sentences:deckData.get('sentence')?.cards||[],
-    records,mode:sentenceWordMode||settings.mode,
-  }),
+  getContext:()=>sentenceWordContext(),
+  getRoot:()=>sentenceWordRoot(),
   stopSpeech:()=>speaker.stop(),
   onInlineChange:()=>refreshSentenceWordList(),
-  onMode:mode=>{sentenceWordMode=mode;refreshSentenceWordList();},
+  onMode:mode=>{if(view==='library')libraryWordMode=mode;else sentenceWordMode=mode;refreshSentenceWordList();},
   onRating:(id,mode,rating)=>{
     const word=deckData.get('vocabulary')?.cards.find(card=>card.id===id);
     if(!word)return false;
@@ -101,10 +99,43 @@ const sentenceWordSheet=createSentenceWordSheet({
   },
 });
 
+function librarySentenceCard() {
+  if(view!=='library' || activeDeck!=='sentence' || !expandedLibrarySentenceId)return null;
+  if($('#library-hide').checked && !revealedRows.has(expandedLibrarySentenceId))return null;
+  return pageCards.find(card=>card.id===expandedLibrarySentenceId)||null;
+}
+function sentenceWordContext() {
+  return {
+    card:view==='library'?librarySentenceCard():activeDeck==='sentence' && view==='study' && revealed?session[position]:null,
+    words:deckData.get('vocabulary')?.cards||[],sentences:deckData.get('sentence')?.cards||[],
+    records,mode:(view==='library'?libraryWordMode:sentenceWordMode)||settings.mode,
+  };
+}
+function sentenceWordRoot() {
+  return view==='library'?$('#library-body [data-library-sentence-detail]'):view==='study'?$('#flashcard'):null;
+}
 function refreshSentenceWordList() {
-  const list=$('#flashcard .sentence-word');
-  if(!list || !session[position])return;
-  list.outerHTML=renderSentenceWords(session[position],deckData.get('vocabulary')?.cards||[],records,sentenceWordMode||settings.mode,sentenceWordSheet.inlineState());
+  const context=sentenceWordContext(),list=sentenceWordRoot()?.querySelector('.sentence-word');
+  if(!list || !context.card)return;
+  list.outerHTML=renderSentenceWords(context.card,context.words,records,context.mode,sentenceWordSheet.inlineState(),view==='library'?'library':'study');
+}
+function clearLibrarySentence() {
+  expandedLibrarySentenceId='';libraryWordMode=null;
+  sentenceWordSheet.close();
+}
+function toggleLibrarySentence(id) {
+  if(view!=='library' || activeDeck!=='sentence' || !pageCards.some(card=>card.id===id))return;
+  if($('#library-hide').checked && !revealedRows.has(id))return;
+  const next=expandedLibrarySentenceId===id?'':id;
+  clearLibrarySentence();expandedLibrarySentenceId=next;
+  renderLibrary();
+  // Re-rendering replaces the activating button, so retain keyboard focus on its new copy.
+  [...$('#library-body').querySelectorAll('[data-library-sentence]')].find(button=>button.dataset.librarySentence===id)?.focus({preventScroll:true});
+}
+function renderLibrarySentenceDetails(card) {
+  const base=card.variation?allVariationLessons().find(lesson=>lesson.cards.some(item=>item.id===card.id))?.baseCard:null;
+  const reference=renderSentenceWords(card,deckData.get('vocabulary')?.cards||[],records,libraryWordMode||settings.mode,sentenceWordSheet.inlineState(),'library');
+  return `<header class="library-sentence-heading"><h2>単語・解説</h2><button type="button" data-library-sentence="${esc(card.id)}" aria-label="この文の解説を閉じる">閉じる <span aria-hidden="true">×</span></button></header>${renderSentenceTranslation2(card)}${card.variation?renderVariationAnswer(card,base):''}${inConversation()?renderConversationNotes(card):''}${reference||'<p class="library-sentence-empty">この文の使用単語はまだ登録されていません。</p>'}`;
 }
 
 function readJSON(key, fallback) {
@@ -356,7 +387,7 @@ function speakQuestion() {
   return speakReadingQuestion({ speaker, card: loaded ? session[position] : null, mode: settings.mode, view, visible: document.visibilityState === 'visible' });
 }
 function startSession(custom = null, { all = false, autoplay = false } = {}) {
-  sentenceWordSheet.close();sentenceWordMode=null;
+  clearLibrarySentence();sentenceWordMode=null;
   composing = false; compositionEndedAt = 0;
   sessionCards = cards;
   sessionLesson = null;
@@ -532,7 +563,7 @@ function previous() {
   renderOverview(); renderCard(); focusCard(); speakQuestion();
 }
 function setView(next, { hash = true } = {}) {
-  sentenceWordSheet.close();
+  clearLibrarySentence();
   speaker.stop();
   if ($('#practice-settings').open) $('#practice-settings').close();
   if ($('#bulk-rating-dialog').open) $('#bulk-rating-dialog').close();
@@ -556,6 +587,7 @@ function renderLibrary() {
   page = Math.max(0, Math.min(page, Math.ceil(matching.length / pageSize) - 1));
   pageCards = matching.slice(page * pageSize, (page + 1) * pageSize);
   const hide = $('#library-hide').checked;
+  if(expandedLibrarySentenceId && !librarySentenceCard())clearLibrarySentence();
   $('#library-body').innerHTML = pageCards.length ? pageCards.map(card => {
     const id = esc(card.id), current = rank(card), mask = hide && !revealedRows.has(card.id);
     const hideHan = mask && settings.libraryDirection === 'han-ko', hideMean = mask && settings.libraryDirection === 'ko-han';
@@ -563,12 +595,17 @@ function renderLibrary() {
     const revealButton = `<button class="masked-answer" data-reveal-row="${id}">表示</button>`;
     const fields = answerFields(card, activeDeck);
     const text = fields.map((field, index) => index ? `<small lang="${field.lang}">${esc(field.text)}</small>` : `<span lang="${field.lang}">${esc(field.text)}</span>`).join('');
-    return `<tr><td><input type="checkbox" data-select-card="${id}" aria-label="${accessibleName}を選ぶ"${selected.has(card.id) ? ' checked' : ''}></td><td class="han-cell">${hideHan ? revealButton : `<span lang="ko">${esc(card.han)}</span>${speechButton(card.han)}`}</td><td class="meaning-cell">${hideMean ? revealButton : text}</td><td>${badge(current)}</td><td><button class="table-queue" data-queue-card="${id}" aria-label="${accessibleName}で演習">演習</button></td></tr>`;
+    const expanded=expandedLibrarySentenceId===card.id;
+    const detailId=`library-sentence-detail-${encodeURIComponent(card.id)}`;
+    const sentence=activeDeck==='sentence' && !mask?`<button type="button" class="library-sentence-toggle" data-library-sentence="${id}" aria-expanded="${expanded}"${expanded?` aria-controls="${esc(detailId)}"`:''} aria-label="${esc(card.han)}の単語・解説"><span lang="ko">${esc(card.han)}</span><span class="library-sentence-arrow" aria-hidden="true">⌄</span></button>`:`<span lang="ko">${esc(card.han)}</span>`;
+    const detail=expanded?`<tr class="library-sentence-detail"><td colspan="5"><section id="${esc(detailId)}" data-library-sentence-detail="${id}" aria-label="${esc(card.han)}の単語・解説">${renderLibrarySentenceDetails(card)}</section></td></tr>`:'';
+    return `<tr${expanded?' class="library-sentence-expanded"':''}><td><input type="checkbox" data-select-card="${id}" aria-label="${accessibleName}を選ぶ"${selected.has(card.id) ? ' checked' : ''}></td><td class="han-cell">${hideHan ? revealButton : `${sentence}${speechButton(card.han)}`}</td><td class="meaning-cell">${hideMean ? revealButton : text}</td><td>${badge(current)}</td><td><button class="table-queue" data-queue-card="${id}" aria-label="${accessibleName}で演習">演習</button></td></tr>${detail}`;
   }).join('') : '<tr><td colspan="5" class="empty-row">該当するカードがありません</td></tr>';
   $('#page-info').textContent = matching.length ? `${page * pageSize + 1} – ${Math.min((page + 1) * pageSize, matching.length)} / ${matching.length}枚` : '0枚';
   $('#prev-page').disabled = page === 0; $('#next-page').disabled = (page + 1) * pageSize >= matching.length;
   $('#library-direction').textContent = settings.libraryDirection === 'ko-han' ? `韓 → ${getDeck(activeDeck).answerShort}` : `${getDeck(activeDeck).answerShort} → 韓`;
   updateSelection();
+  sentenceWordSheet.refresh();
 }
 function updateSelection() {
   const present = new Set(studyCards().map(card => card.id)); selected = new Set([...selected].filter(id => present.has(id)));
@@ -887,6 +924,7 @@ function bind() {
     if(target.hasAttribute('data-sentence-word-status')) { sentenceWordSheet.open(Number(target.dataset.sentenceWordStatus),{status:true});return; }
     if(target.dataset.sentenceWordRating) { sentenceWordSheet.rateInline(target.dataset.sentenceWordRating);return; }
     if(target.dataset.sentenceWordMode) { sentenceWordSheet.setMode(target.dataset.sentenceWordMode);return; }
+    if(target.dataset.librarySentence) { toggleLibrarySentence(target.dataset.librarySentence);return; }
     if (target.dataset.homeDeck && loaded) { switchDeck(target.dataset.homeDeck); if(target.dataset.homeDeck==='sentence') switchSentenceCollection('core'); return; }
     if (target.dataset.sentenceCollection && loaded && activeDeck==='sentence') { switchSentenceCollection(target.dataset.sentenceCollection); return; }
     if (target.dataset.homeMode && loaded) { switchMode(target.dataset.homeMode); return; }
@@ -984,9 +1022,9 @@ function bind() {
     if (!(inOrderedLesson() ? studyCards().length : practicePool(studyCards(), records, scopedSettings(draftSettings)).length)) return;
     persistSettings({ start: true });
   };
-  $('#library-search').oninput = () => { page = 0; renderLibrary(); };
-  $('#library-hide').onchange = () => { revealedRows.clear(); renderLibrary(); };
-  $('#library-direction').onclick = () => { settings.libraryDirection = settings.libraryDirection === 'ko-han' ? 'han-ko' : 'ko-han'; savePreferences(); revealedRows.clear(); renderLibrary(); };
+  $('#library-search').oninput = () => { clearLibrarySentence(); page = 0; renderLibrary(); };
+  $('#library-hide').onchange = () => { clearLibrarySentence(); revealedRows.clear(); renderLibrary(); };
+  $('#library-direction').onclick = () => { clearLibrarySentence(); settings.libraryDirection = settings.libraryDirection === 'ko-han' ? 'han-ko' : 'ko-han'; savePreferences(); revealedRows.clear(); renderLibrary(); };
   $('#library-body').onchange = event => {
     const el = event.target;
     if (el.dataset.selectCard) { if (el.checked) selected.add(el.dataset.selectCard); else selected.delete(el.dataset.selectCard); updateSelection(); }
@@ -1000,7 +1038,7 @@ function bind() {
   $('#undo-bulk-rating').onclick = revertBulkRating;
   $('#close-bulk-rating').onclick = $('#cancel-bulk-rating').onclick = () => $('#bulk-rating-dialog').close();
   $('#bulk-rating-dialog').addEventListener('close', () => { bulkRatingDraft = null; });
-  $('#prev-page').onclick = () => { page -= 1; renderLibrary(); }; $('#next-page').onclick = () => { page += 1; renderLibrary(); };
+  $('#prev-page').onclick = () => { clearLibrarySentence(); page -= 1; renderLibrary(); }; $('#next-page').onclick = () => { clearLibrarySentence(); page += 1; renderLibrary(); };
   window.addEventListener('pagehide', () => speaker.stop());
   document.addEventListener('visibilitychange', () => { if (document.hidden) speaker.stop(); else if (loaded) refreshRemote(); });
   window.addEventListener('hashchange', () => setView(location.hash.slice(1), { hash: false }));

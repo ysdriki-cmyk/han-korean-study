@@ -10,7 +10,9 @@
 .page-heading > span { color: #667085; font-size: 14px; }
 .page-heading > span strong { margin-right: 5px; color: #263348; font-size: 20px; font-weight: 600; }
 
-#library-view button, #progress-view button { min-height: 40px; }
+#library-view > :not(.table-wrap) button,
+#library-view > .table-wrap > table > tbody > tr > td > button,
+#progress-view button { min-height: 40px; }
 .rank-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
 .rank-filter {
   display: inline-flex; align-items: center; justify-content: center; gap: 7px;
@@ -40,16 +42,16 @@
 .selection-bar > span { color: #667085; font-size: 13px; }
 .selection-bar > .button { margin-left: auto; }
 .table-wrap { overflow: auto; border: 1px solid #dfe5ed; border-radius: 0 0 12px 12px; background: #fff; box-shadow: 0 2px 6px #26334804; }
-#library-view table { border-collapse: collapse; width: 100%; text-align: left; }
-#library-view th { padding: 15px 18px; background: #f8fafc; color: #667085; font-size: 13px; font-weight: 600; white-space: nowrap; }
-#library-view td { padding: 17px 18px; border-top: 1px solid #e9edf3; color: #344054; font-size: 15px; line-height: 1.8; vertical-align: middle; overflow-wrap: anywhere; }
-#library-view td:first-child { width: 48px; padding-right: 0; }
-#library-view td:last-child { width: 80px; }
-#library-view tr:hover td { background: #f9fbfe; }
-#library-view td.han-cell { min-width: 100px; color: #263348; font-family: 'Noto Sans KR', sans-serif; font-size: 27px; font-weight: 500; }
-#library-view td.meaning-cell { min-width: 180px; max-width: 440px; }
-#library-view td.meaning-cell > small { display: block; margin-top: 4px; color: #667085; font-size: 13px; line-height: 1.7; }
-#library-view .empty-row { padding: 48px 20px; text-align: center; color: #667085; }
+#library-view > .table-wrap > table { border-collapse: collapse; width: 100%; text-align: left; }
+#library-view > .table-wrap > table > thead > tr > th { padding: 15px 18px; background: #f8fafc; color: #667085; font-size: 13px; font-weight: 600; white-space: nowrap; }
+#library-view > .table-wrap > table > tbody > tr > td { padding: 17px 18px; border-top: 1px solid #e9edf3; color: #344054; font-size: 15px; line-height: 1.8; vertical-align: middle; overflow-wrap: anywhere; }
+#library-view > .table-wrap > table > tbody > tr > td:first-child { width: 48px; padding-right: 0; }
+#library-view > .table-wrap > table > tbody > tr > td:last-child { width: 80px; }
+#library-view > .table-wrap > table > tbody > tr:hover > td { background: #f9fbfe; }
+#library-view > .table-wrap > table > tbody > tr > td.han-cell { min-width: 100px; color: #263348; font-family: 'Noto Sans KR', sans-serif; font-size: 27px; font-weight: 500; }
+#library-view > .table-wrap > table > tbody > tr > td.meaning-cell { min-width: 180px; max-width: 440px; }
+#library-view > .table-wrap > table > tbody > tr > td.meaning-cell > small { display: block; margin-top: 4px; color: #667085; font-size: 13px; line-height: 1.7; }
+#library-view > .table-wrap > table > tbody > tr > td.empty-row { padding: 48px 20px; text-align: center; color: #667085; }
 .rank-select {
   min-height: 40px; max-width: 155px; padding: 8px 10px;
   border: 1px solid #cbd5e1; border-radius: 8px; background: var(--rank-bg, #f0f4fa);
@@ -124,12 +126,12 @@ dialog::backdrop { background: #1c2b414d; backdrop-filter: blur(3px); }
   .selection-bar { flex-wrap: wrap; gap: 10px; padding: 12px; }
   .selection-bar > span { margin-left: auto; font-size: 12px; }
   .selection-bar > .button { flex-basis: 100%; margin-left: 0; font-size: 13px; }
-  #library-view th { padding: 13px 12px; font-size: 12px; }
-  #library-view td { padding: 15px 12px; font-size: 14px; }
-  #library-view td:first-child { width: 40px; }
-  #library-view td.han-cell { min-width: 85px; font-size: 24px; }
-  #library-view td.meaning-cell { min-width: 160px; }
-  #library-view td.meaning-cell > small { font-size: 12px; }
+  #library-view > .table-wrap > table > thead > tr > th { padding: 13px 12px; font-size: 12px; }
+  #library-view > .table-wrap > table > tbody > tr > td { padding: 15px 12px; font-size: 14px; }
+  #library-view > .table-wrap > table > tbody > tr > td:first-child { width: 40px; }
+  #library-view > .table-wrap > table > tbody > tr > td.han-cell { min-width: 85px; font-size: 24px; }
+  #library-view > .table-wrap > table > tbody > tr > td.meaning-cell { min-width: 160px; }
+  #library-view > .table-wrap > table > tbody > tr > td.meaning-cell > small { font-size: 12px; }
   .rank-select { max-width: 145px; padding: 8px; font-size: 12px; }
   .table-queue, .table-practice, .masked-answer { padding: 8px 11px; font-size: 12px; }
   .pagination { gap: 10px; margin-top: 18px; font-size: 12px; }

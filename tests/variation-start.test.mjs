@@ -103,7 +103,7 @@ function application({query='',group='all',sample=.999,availableIds=null,recordS
       return randomVariationLesson(candidates,{...options,random:()=>randomSample});
     },
     savePreferences:()=>preferenceWrites.push(true),syncSettingsForm(){},updateCourseChrome(){},renderOverview(){},renderCard(){},
-    sentenceWordSheet:{close(){}},kanjiPromptChoices:()=>[],
+    sentenceWordSheet:{close(){}},clearLibrarySentence(){},kanjiPromptChoices:()=>[],
     speakQuestion:()=>{spoken++;},
     // Ordered lessons must never enter the ordinary card filtering/shuffling path.
     pool(){throw new Error('variation entered the ordinary practice pool');},

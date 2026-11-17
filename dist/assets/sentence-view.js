@@ -25,7 +25,7 @@ export function sentenceWordEntries(card, words) {
   })):[{...row,key:`${index}:missing`,word:null}]);
 }
 
-export function renderSentenceWords(card, words, records={}, mode='read', inline=null) {
+export function renderSentenceWords(card, words, records={}, mode='read', inline=null, scope='study') {
   const entries=sentenceWordEntries(card,words);
   if (!entries.length) return '';
   const {rows,main}=resolveSentenceWords(card,words);
@@ -35,8 +35,9 @@ export function renderSentenceWords(card, words, records={}, mode='read', inline
     const status=statuses.find(item=>item.id===rating)||UNSEEN;
     const statusLabel=row.word?`${row.lemma}の単語ステータス：${modeLabel(mode)} ${status.symbol} ${labels[status.id]}。変更する`:`${row.lemma}は単語帳に未登録`;
     const expanded=Boolean(row.word && inline?.key===row.key);
-    const statusButton=`<button type="button" class="sentence-word-status rating-${status.id}" data-sentence-word-status="${index}" aria-label="${esc(statusLabel)}" aria-expanded="${expanded}"${expanded?` aria-controls="sentence-word-ratings-${index}"`:''}${row.word?'':' disabled'}><span class="rating-symbol">${status.symbol}</span></button>`;
-    const choices=expanded?`<tr class="sentence-word-rating-row"><td colspan="3"><div id="sentence-word-ratings-${index}" class="sentence-word-ratings" role="group" aria-label="${esc(row.lemma)}の${modeLabel(mode)}評価">${statuses.map(item=>`<button type="button" class="rating-${item.id}" data-sentence-word-rating="${item.id}" aria-label="${esc(row.lemma)}を${modeLabel(mode)} ${item.symbol} ${labels[item.id]}に変更" title="${esc(labels[item.id])}" aria-pressed="${rating===item.id}"><span class="rating-symbol" aria-hidden="true">${item.symbol}</span></button>`).join('')}</div>${inline.feedback?`<p class="sentence-word-feedback" role="alert">${esc(inline.feedback)}</p>`:''}</td></tr>`:'';
+    const ratingId=`${esc(scope)}-sentence-word-ratings-${index}`;
+    const statusButton=`<button type="button" class="sentence-word-status rating-${status.id}" data-sentence-word-status="${index}" aria-label="${esc(statusLabel)}" aria-expanded="${expanded}"${expanded?` aria-controls="${ratingId}"`:''}${row.word?'':' disabled'}><span class="rating-symbol">${status.symbol}</span></button>`;
+    const choices=expanded?`<tr class="sentence-word-rating-row"><td colspan="3"><div id="${ratingId}" class="sentence-word-ratings" role="group" aria-label="${esc(row.lemma)}の${modeLabel(mode)}評価">${statuses.map(item=>`<button type="button" class="rating-${item.id}" data-sentence-word-rating="${item.id}" aria-label="${esc(row.lemma)}を${modeLabel(mode)} ${item.symbol} ${labels[item.id]}に変更" title="${esc(labels[item.id])}" aria-pressed="${rating===item.id}"><span class="rating-symbol" aria-hidden="true">${item.symbol}</span></button>`).join('')}</div>${inline.feedback?`<p class="sentence-word-feedback" role="alert">${esc(inline.feedback)}</p>`:''}</td></tr>`:'';
     return `<tr${row.main?' class="sentence-main-row"':''}><td>${statusButton}</td><td lang="ko"><div class="sentence-word-lemma"><button type="button" class="sentence-word-open" data-sentence-word-open="${index}" aria-label="${esc(row.lemma)}の意味と例文" aria-haspopup="dialog">${esc(row.lemma)}</button>${speechButton(row.lemma)}</div></td><td lang="ja">${esc(row.japanese)||'—'}</td></tr>${choices}`;
   }).join('');
   const nextMode=mode==='write'?'read':'write';

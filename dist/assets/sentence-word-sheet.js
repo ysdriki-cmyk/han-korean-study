@@ -1,8 +1,8 @@
-import { sentenceWordEntries, renderSentenceWordSheet } from './sentence-view.js?v=12';
+import { sentenceWordEntries, renderSentenceWordSheet } from './sentence-view.js?v=13';
 import { RATINGS, UNSEEN } from './assessment.js?v=3';
 
 /** Native modal focus trapping, scoped rating edits and example paging. */
-export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopSpeech,onInlineChange=()=>{}}) {
+export function createSentenceWordSheet({dialog,getContext,getRoot=()=>document,onMode,onRating,stopSpeech,onInlineChange=()=>{}}) {
   let selected=null,inline=null;
   const content=dialog.querySelector('#sentence-word-sheet');
   const ratings=new Set([...RATINGS,UNSEEN].map(item=>item.id));
@@ -18,7 +18,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     const context=contextFor(previous);
     if(!context)return;
     const index=sentenceWordEntries(context.card,context.words).findIndex(row=>row.key===previous.key);
-    document.querySelector(`[data-sentence-word-status="${index}"]`)?.focus({preventScroll:true});
+    getRoot()?.querySelector(`[data-sentence-word-status="${index}"]`)?.focus({preventScroll:true});
   }
   function inlineState() {
     return contextFor(inline)?{key:inline.key,feedback:inline.feedback||''}:null;
@@ -49,7 +49,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
       if(dialog.open)dialog.close();
       if(inline?.cardId===context.card.id && inline.key===entry.key){closeInline();return;}
       inline={cardId:context.card.id,key:entry.key};onInlineChange();
-      document.querySelector('[data-sentence-word-rating][aria-pressed="true"]')?.focus({preventScroll:true});
+      getRoot()?.querySelector('[data-sentence-word-rating][aria-pressed="true"]')?.focus({preventScroll:true});
       return;
     }
     closeInline({focus:false});
@@ -66,7 +66,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     if(inline)inline.feedback='';
     stopSpeech();onMode(mode);
     if(dialog.open)refresh({focus:`[data-word-sheet-mode="${mode}"]`});
-    else document.querySelector('[data-sentence-word-mode]')?.focus({preventScroll:true});
+    else getRoot()?.querySelector('[data-sentence-word-mode]')?.focus({preventScroll:true});
   }
   function rateInline(rating) {
     const context=contextFor(inline);
@@ -74,7 +74,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     if(!ratings.has(rating))return false;
     if(onRating(context.entry.word.id,context.mode,rating)){closeInline();return true;}
     inline.feedback='保存できませんでした。もう一度お試しください。';onInlineChange();
-    document.querySelector(`[data-sentence-word-rating="${rating}"]`)?.focus({preventScroll:true});
+    getRoot()?.querySelector(`[data-sentence-word-rating="${rating}"]`)?.focus({preventScroll:true});
     return false;
   }
   dialog.addEventListener('click',event=>{
@@ -111,7 +111,7 @@ export function createSentenceWordSheet({dialog,getContext,onMode,onRating,stopS
     if(previous && context.card?.id===previous.cardId) {
       const entries=sentenceWordEntries(context.card,context.words);
       const index=entries.findIndex(entry=>entry.key===previous.key);
-      if(index>=0)document.querySelector(`[data-sentence-word-open="${index}"]`)?.focus({preventScroll:true});
+      if(index>=0)getRoot()?.querySelector(`[data-sentence-word-open="${index}"]`)?.focus({preventScroll:true});
     }
   });
   return {open,close,refresh,inlineState,rateInline,setMode,isOpen:()=>dialog.open||Boolean(inline)};
